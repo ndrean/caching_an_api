@@ -1,0 +1,30 @@
+################################################
+## RESULTS
+
+# -> Ets Cached (starting with: yield_many_asynced_stream)
+Comparison: 
+stream_synced                    11.78 K
+enum_yield_many                  5.63 K - 1.76x slower +264.55 μs
+yield_many_asynced_stream        4.02 K - 2.82x slower +633.34 μs
+asynced_stream                   3.30 K - 2.87x slower +651.90 μs
+
+# -> Mnesia Cached (starting with: yield_many_asynced_stream)
+Comparison: 
+stream_synced                    1.68 K
+enum_yield_many                  1.35 K - 1.25x slower +146.94 μs
+yield_many_asynced_stream        1.08 K - 1.55x slower +327.10 μs
+asynced_stream                   0.94 K - 1.79x slower +472.80 μs
+
+# -> Ets no cache
+Comparison: 
+enum_yield_many                   14.10
+asynced_stream                     5.51 - 2.56x slower +110.73 ms
+yield_many_asynced_stream          1.50 - 9.38x slower +593.94 ms
+stream_synced                      1.25 - 11.30x slower +730.10 ms
+
+# -> Mnesia no cache
+Comparison: 
+enum_yield_many                   14.50
+asynced_stream                     5.84 - 2.48x slower +102.30 ms
+yield_many_asynced_stream          1.64 - 8.85x slower +541.50 ms
+stream_synced                      1.35 - 10.75x slower +672.48 ms
