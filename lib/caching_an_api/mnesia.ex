@@ -8,23 +8,6 @@ defmodule MnDb do
   an MNesia store, the two functions `read` and `write`and manages the
   distribution of the Mnesia store within the connected nodes of a cluster.
   """
-  @doc """
-  Creates a schema _before_ starting Mnesia,
-  then starts the Mnesia process, and finally creates a table.
-  """
-
-  # Mnesia alone
-  def setup(_name) do
-    inspect(node()) |> Logger.info()
-  end
-
-  def local_start(name) do
-    with :ok <- ensure_schema_from_ram_to_disc_copy(:schema),
-         :ok <- ensure_start(name),
-         :ok <- ensure_table_create(name) do
-      :ok
-    end
-  end
 
   def write(m_table, id, data) do
     Mnesia.transaction(fn ->
@@ -59,18 +42,6 @@ defmodule MnDb do
     end)
   end
 
-  ######################################
-  @doc """
-  This function returns a map of tables and their cookies.
-  """
-  def get_table_cookies(node \\ node()) do
-    # tables
-    :rpc.call(node, :mnesia, :system_info, [:tables])
-    |> Enum.reduce(%{}, fn t, acc ->
-      Map.put(acc, t, :rpc.call(node, :mnesia, :table_info, [t, :cookie]))
-    end)
-  end
-
   ########################################
 
   @doc """
@@ -90,19 +61,16 @@ defmodule MnDb do
 
       {:ok, []} ->
         Logger.info("Initialze Node List")
-        # {:error, {:failed_to_connect_node}}
         :ok
 
       {:error, {:merge_schema_failed, msg}} ->
         Logger.info("merge_schema_failed")
         Logger.info("#{inspect(msg)}")
         ### TRIAL
-        _node_db_folder = Application.get_env(:mnesia, :dir) |> to_string
+        # _node_db_folder = Application.get_env(:mnesia, :dir) |> to_string
         # {:ok, list} = File.rm_rf(node_db_folder)
-        # inspect(list) |> Logger.info()
-        # connect_mnesia_to_cluster(:mcache)
         ### TRIAL
-        :ok
+        :error
 
       {:error, reason} ->
         {:error, reason}
@@ -110,31 +78,24 @@ defmodule MnDb do
   end
 
   def connect_mnesia_to_cluster(name) do
-    :ok = ensure_start(name)
-    :ok = update_mnesia_nodes()
-    :ok = ensure_schema_from_ram_to_disc_copy(:schema)
-    :ok = ensure_table_create(name)
-    :ok = ensure_table_copy_exists_at_node(name)
-
-    tables = Mnesia.system_info(:local_tables)
-    Logger.info("check tables: #{inspect(tables)}")
-
-    Logger.info("Successfully connected Mnesia to the cluster!")
+    with :ok <- ensure_start(name),
+         :ok <- update_mnesia_nodes(),
+         :ok <- ensure_table_from_ram_to_disc_copy(:schema),
+         :ok <- ensure_table_create(name),
+         :ok <- ensure_table_copy_exists_at_node(name) do
+      Logger.info("Successfully connected Mnesia to the cluster!")
+    end
   end
 
-  def ensure_schema_from_ram_to_disc_copy(name) do
+  def ensure_table_from_ram_to_disc_copy(name) do
     case Mnesia.change_table_copy_type(name, node(), :disc_copies) do
       {:atomic, :ok} ->
         Logger.info("#{name} created")
         :ok
 
       {:aborted, {:already_exists, :schema, _, _}} ->
-        Logger.info("#{name} exists")
+        Logger.info("#{name} exists on disc")
         :ok
-
-      # {:error, {:already_exists, _name, _, :disc_copies}} ->
-      #   Logger.info("table #{name} already on disc")
-      #   :ok
 
       {:aborted, reason} ->
         {:error, reason}
@@ -151,16 +112,12 @@ defmodule MnDb do
         {:aborted, {:already_exists, _name, _node}} ->
           Logger.info("Table #{name} exists, already on disc at node")
           :ok
-
-        {:error, {:already_exists, name, node, :disc_copies}} ->
-          Logger.info("Table #{name} already on disc for #{node}")
-          :ok
       end
     end
   end
 
   def ensure_table_create(name) do
-    table = Mnesia.create_table(name, attributes: [:post_id, :data])
+    table = Mnesia.create_table(name, attributes: [:post_id, :data], disc_copies: [node()])
 
     with :ok <- wait_for(name) do
       case table do
@@ -192,13 +149,7 @@ defmodule MnDb do
         :ok
 
       :no ->
-        # local_start(name)
-        # |> inspect(label: "local start")
-
         {:error, :mnesia_unexpectedly_stopped}
-
-      :stopping ->
-        {:error, :mnesia_unexpectedly_stopping}
 
       :starting ->
         Process.sleep(200)
@@ -206,23 +157,23 @@ defmodule MnDb do
     end
   end
 
-  def ensure_schema_create(name) do
-    case Mnesia.create_schema([node()]) do
-      {:aborted, {:already_exists, ^name}} ->
-        Logger.info("aborted local schema exists")
-        :ok
+  # def ensure_schema_create(name) do
+  #   case Mnesia.create_schema([node()]) do
+  #     {:aborted, {:already_exists, ^name}} ->
+  #       Logger.info("aborted local schema exists")
+  #       :ok
 
-      {:error, {_node, {:already_exists, __node}}} ->
-        Logger.info("node local schema exists")
-        :ok
+  #     {:error, {_node, {:already_exists, __node}}} ->
+  #       Logger.info("node local schema exists")
+  #       :ok
 
-      {:error, reason} ->
-        {:error, reason}
+  #     {:error, reason} ->
+  #       {:error, reason}
 
-      :ok ->
-        :ok
-    end
-  end
+  #     :ok ->
+  #       :ok
+  #   end
+  # end
 
   ##################################
   def delete_schema do
@@ -253,5 +204,17 @@ defmodule MnDb do
         Process.sleep(1_000)
         ensure_delete_schema(name)
     end
+  end
+
+  ######################################
+  @doc """
+  This function returns a map of tables and their cookies.
+  """
+  def get_table_cookies(node \\ node()) do
+    # tables
+    :rpc.call(node, :mnesia, :system_info, [:tables])
+    |> Enum.reduce(%{}, fn t, acc ->
+      Map.put(acc, t, :rpc.call(node, :mnesia, :table_info, [t, :cookie]))
+    end)
   end
 end

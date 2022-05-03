@@ -12,7 +12,7 @@ defmodule CachingAnApi.Application do
         strategy: Cluster.Strategy.Epmd,
         config: [
           #   # ->  for strategy Cluster.Strategy.Epmd
-          hosts: [:a@MacBookND, :b@MacBookND]
+          hosts: [:a@MacBookND]
         ],
         connect: {:net_kernel, :connect_node, []},
         # The function to use for disconnecting nodes. The node

@@ -15,6 +15,7 @@ We cache the responses to API calls.
 # if you don't use use the short name but the flag --name, then a@example.com
 $ iex --sname a -S mix
 iex> Node.connect(:a@MacBookND)
+iex> iex --sname a --erl "-connect_all false" -S  mix
 ```
 
 ## Mnesia

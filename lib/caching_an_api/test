@@ -54,3 +54,7 @@ defmodule CachingAnApi.T do
     end
   end
 end
+
+CachingAnApi.Api.fetch(1, &CachingAnApi.Api.sync/1)
+
+CachingAnApi.Cache.get(1)

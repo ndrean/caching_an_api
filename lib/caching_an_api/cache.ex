@@ -1,7 +1,6 @@
 defmodule CachingAnApi.Cache do
   use GenServer
   alias :ets, as: Ets
-  alias :mnesia, as: Mnesia
   require EtsDb
   require MnDb
   require Logger
@@ -95,6 +94,8 @@ defmodule CachingAnApi.Cache do
     {:reply, cache, state}
   end
 
+  :mnesia.set_master_nodes(:mcache, Node.list())
+
   @impl true
   def handle_cast({:put, key, data}, state) do
     %{ets_table: ets_table, m_table: m_table, store: store, cache_on: cache_on} = state
@@ -129,6 +130,7 @@ defmodule CachingAnApi.Cache do
 
   @impl true
   def handle_info({:nodeup, _node}, %{m_table: m_table} = state) do
+    Logger.info("new node")
     MnDb.connect_mnesia_to_cluster(m_table)
 
     {:noreply, state}

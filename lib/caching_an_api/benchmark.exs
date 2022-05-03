@@ -25,5 +25,7 @@ Benchee.run(
       CachingAnApi.Api.stream_synced()
     end
   },
-  time: 10
+  warmup: 4,
+  time: 5,
+  parallel: :erlang.system_info(:logical_processors_available)
 )

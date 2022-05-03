@@ -1,7 +1,7 @@
 defmodule CachingAnApi.Api do
   alias CachingAnApi.{Cache}
   @url "https://jsonplaceholder.typicode.com/todos/"
-  @range 10..11
+  @range 10..20
   # @cache true
 
   def fetch(i, f) do
@@ -12,7 +12,6 @@ defmodule CachingAnApi.Api do
         f.(i)
 
       %{"was_cached" => bool} ->
-        IO.puts("ici")
         fetch_or_update_cache(bool, i, data)
     end
   end
