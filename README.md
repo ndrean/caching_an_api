@@ -1,24 +1,32 @@
 # CachingAnApi
 
+## Testing Ets vs Mnesia: **test** branch
+
 We cache the responses to API calls.
 
 - within a GenServer that holds in the state the HTTP responses. The client operations are transfered to the server via callbacks. If it comes to crash, the data is lost
 
 - within an ETS data store. It is an in-memory key-value database localized within a node.The data store is not distributed: other nodes within a cluster can't access to it.
 
-- within a distributed Mnesia data store. It stores tuples inside tables,
+- within a Mnesia data store. It stores tuples inside tables,
 
-## Cluster creation
+## Cluster creation : **Master** branch
+
+Use `libcluster`
 
 ```bash
 # use the flag --sname (for short name) and it will assign :a@your-local-system-name
 # if you don't use use the short name but the flag --name, then a@example.com
 $ iex --sname a -S mix
 iex> Node.connect(:a@MacBookND)
-iex> iex --sname a --erl "-connect_all false" -S  mix
+iex> iex --sname a --erl "-connect_all false" --cookie cookie_s -S  mix
+iex> iex --name a@127.0.0.1 --erl "-config sys.config" -S mix
+iex> iex --name b@127.0.0.1 --erl "-config sys.config" -S mix
 ```
 
 ## Mnesia
+
+<http://erlang.org/documentation/doc-5.2/pdf/mnesia-4.1.pdf>
 
 <https://mbuffa.github.io/tips/20201111-elixir-troubleshooting-mnesia/>
 
@@ -27,6 +35,8 @@ iex> iex --sname a --erl "-connect_all false" -S  mix
 <https://code.tutsplus.com/articles/store-everything-with-elixir-and-mnesia--cms-29821>
 
 Both schema and table can be already created when you run your app, since Mnesia keeps RAM and disk copies, depending on how you configure it.
+
+### Single node mode
 
 DONT add `:mnesia` in `CachingAnApi.MixProject.application[:extra_applications]` since you will need to start it manually. Instead, add `included_applications: [:mnesia]`, this will also remove the warnings in VSCode. The reason is that you need to firstly create the schema (meaning you create the database), and only then start Mnesia. Thus we have a startup chain:
 
@@ -52,7 +62,7 @@ In Mnesia, every action needs to be wrapped within a transaction. If something g
 
 - `:atomic` All operations should occur or no operations should occur in case of an error
 
-## Disc persistance of tables
+### Disc persistance of tables
 
 Tables can be saved both in RAM and on disc. From the Erlang/Mnesia documentation, it is said that "the directory must be unique for each node. Two nodes must never share the same directory".
 
@@ -75,24 +85,30 @@ If someone has a write lock, no one can acquire either a read lock or a write lo
 
 ### Distributing Mnesia
 
-- connect nodes
+- start Mnesia
 
-- inform Mnesia that other nodes belong to the cluster:
+- connect nodes and inform Mnesia that other nodes belong to the cluster:
 
-- ensure that data can be stored on disc
-
-- add the table to the new node
+- ensure that data (schema and table) are stored on disc
 
 ```elixir
-def connect_mnesia do
-    :mnesia.start()
-    :mnesia.change_config(:extra_db_nodes, Node.list())
-    :mnesia.change_table_copy_type(:schema, node(), :disc_copies)
-    :mnesia.add_table_copy(GameState, node(), :disc_copies)
+def connect_mnesia_to_cluster(name) do
+    with :ok <- ensure_start(name),
+         :ok <- update_mnesia_nodes(),
+         :ok <- ensure_table_from_ram_to_disc_copy(:schema),
+         :ok <- ensure_table_create(name),
+         :ok <- ensure_table_from_ram_to_disc_copy(name) do
+      Logger.info("Successfully connected Mnesia to the cluster!")
+    end
   end
+end
   ```
 
-- reconfgure Mnesia to share it's contents
+### Debug Mnesia
+
+```elixir
+iex> :mnesia.system_info()
+```
 
 ## Run the tests
 

@@ -5,36 +5,26 @@ defmodule CachingAnApi.Application do
 
   @impl true
   def start(_type, _args) do
-    # import Supervisor.Spec, warn: false
+    import Supervisor.Spec, warn: false
 
-    topologies = [
-      gossip: [
-        strategy: Cluster.Strategy.Epmd,
-        config: [
-          #   # ->  for strategy Cluster.Strategy.Epmd
-          hosts: [:a@MacBookND]
-        ],
-        connect: {:net_kernel, :connect_node, []},
-        # The function to use for disconnecting nodes. The node
-        # name will be appended to the argument list. Optional
-        disconnect: {:erlang, :disconnect_node, []},
-        # The function to use for listing nodes.
-        # This function must return a list of node names. Optional
-        list_nodes: {:erlang, :nodes, [:connected]}
-      ]
-    ]
+    topologies = Application.get_env(:libcluster, :topologies) || []
 
     opts = [strategy: :one_for_one, name: CachingAnApi.Supervisor]
+
+    cache_opt = [
+      store: :mn,
+      cache_on: true,
+      mn_table: :mcache,
+      ets_table: :ecache
+    ]
 
     # list to be supervised
     [
       # start the cache
-      {CachingAnApi.Cache, [store: :mn, cache_on: true, mn_table: :mcache, ets_table: :ecache]},
+      {Cache, cache_opt},
       # start libcluster
       {Cluster.Supervisor, [topologies, [name: CachingAnApi.ClusterSupervisor]]}
     ]
     |> Supervisor.start_link(opts)
   end
 end
-
-# Cluster.CachingAnApiSupervisor

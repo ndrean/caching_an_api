@@ -13,16 +13,16 @@ Benchee.run(
     #   CachingAnApi.T.test4()
     # end
     "yield_many_asynced_stream" => fn ->
-      CachingAnApi.Api.yield_many_asynced_stream()
+      Api.yield_many_asynced_stream()
     end,
     "asynced_stream" => fn ->
-      CachingAnApi.Api.asynced_stream()
+      Api.asynced_stream()
     end,
     "enum_yield_many" => fn ->
-      CachingAnApi.Api.enum_yield_many()
+      Api.enum_yield_many()
     end,
     "stream_synced" => fn ->
-      CachingAnApi.Api.stream_synced()
+      Api.stream_synced()
     end
   },
   warmup: 4,

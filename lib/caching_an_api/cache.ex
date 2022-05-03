@@ -1,4 +1,4 @@
-defmodule CachingAnApi.Cache do
+defmodule Cache do
   use GenServer
   alias :ets, as: Ets
   require EtsDb
@@ -8,6 +8,9 @@ defmodule CachingAnApi.Cache do
   # @mn_table :mcache
   # @ets_table :ecache
 
+  @doc """
+  We pass config options set in the Application level and name the GenServer pid with the module name.
+  """
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -38,6 +41,9 @@ defmodule CachingAnApi.Cache do
   `GenServer.start_link` calls `GenServer.init` and passes the arguments "opts"
   that where set in "Application.ex".
   Note: the argument in `init` should match the 2d argument used in `GenServer.start_link`.
+
+  The GenServer process subscribes to node status change messages (:nodeup, :nodedown)
+
   """
   @impl true
   def init(opts) do
@@ -45,15 +51,13 @@ defmodule CachingAnApi.Cache do
     ets_table = opts[:ets_table]
     mn_table = opts[:mn_table]
 
-    # Get notified when new nodes are connected.
+    # subscribe to node changes
     :ok = :net_kernel.monitor_nodes(true)
 
     # init the ETS store
     case et = EtsDb.setup(ets_table) do
       _ -> Logger.info("Ets cache up: #{et}")
     end
-
-    # if Mnesia.system_info(:running_db_nodes) == [node()], do: MnDb.local_start(mn_table)
 
     state = %{
       ets_table: ets_table,
@@ -129,8 +133,10 @@ defmodule CachingAnApi.Cache do
   end
 
   @impl true
-  def handle_info({:nodeup, _node}, %{m_table: m_table} = state) do
-    Logger.info("new node")
+  def handle_info({:nodeup, node}, %{m_table: m_table} = state) do
+    Logger.info("Detected new node #{inspect(node)}")
+
+    Process.sleep(1500)
     MnDb.connect_mnesia_to_cluster(m_table)
 
     {:noreply, state}

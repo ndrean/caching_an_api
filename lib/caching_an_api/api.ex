@@ -1,5 +1,5 @@
-defmodule CachingAnApi.Api do
-  alias CachingAnApi.{Cache}
+defmodule Api do
+  alias Cache
   @url "https://jsonplaceholder.typicode.com/todos/"
   @range 10..20
   # @cache true
