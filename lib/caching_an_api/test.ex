@@ -46,4 +46,11 @@ defmodule CachingAnApi.T do
 
     t
   end
+
+  def rec(x) do
+    cond do
+      x < 10 -> x + 1
+      true -> x
+    end
+  end
 end

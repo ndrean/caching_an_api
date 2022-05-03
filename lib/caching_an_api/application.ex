@@ -31,7 +31,7 @@ defmodule CachingAnApi.Application do
       # start the cache
       {CachingAnApi.Cache, [store: :mn, cache_on: true, mn_table: :mcache, ets_table: :ecache]},
       # start libcluster
-      {Cluster.Supervisor, [topologies, [name: Cluster.CachingAnApiSupervisor]]}
+      {Cluster.Supervisor, [topologies, [name: CachingAnApi.ClusterSupervisor]]}
     ]
     |> Supervisor.start_link(opts)
   end

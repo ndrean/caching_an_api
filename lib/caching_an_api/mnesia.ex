@@ -19,10 +19,9 @@ defmodule MnDb do
   end
 
   def local_start(name) do
-    with :ok <- ensure_schema_create(name),
+    with :ok <- ensure_schema_from_ram_to_disc_copy(:schema),
          :ok <- ensure_start(name),
-         :ok <- ensure_table_create(name),
-         :ok <- ensure_schema_from_ram_to_disc_copy(name) do
+         :ok <- ensure_table_create(name) do
       :ok
     end
   end
@@ -90,17 +89,13 @@ defmodule MnDb do
         :ok
 
       {:ok, []} ->
-        ### TRIAL
-        # node_db_folder = Application.get_env(:mnesia, :dir) |> to_string
-        # {:ok, list} = File.rm_rf(node_db_folder)
-        # inspect(list) |> Logger.info()
-        ###
         Logger.info("Initialze Node List")
-        {:error, {:failed_to_connect_node}}
+        # {:error, {:failed_to_connect_node}}
         :ok
 
-      {:error, {:merge_schema_failed, _}} ->
+      {:error, {:merge_schema_failed, msg}} ->
         Logger.info("merge_schema_failed")
+        Logger.info("#{inspect(msg)}")
         ### TRIAL
         _node_db_folder = Application.get_env(:mnesia, :dir) |> to_string
         # {:ok, list} = File.rm_rf(node_db_folder)
@@ -115,18 +110,16 @@ defmodule MnDb do
   end
 
   def connect_mnesia_to_cluster(name) do
-    IO.puts("start connection")
     :ok = ensure_start(name)
     :ok = update_mnesia_nodes()
     :ok = ensure_schema_from_ram_to_disc_copy(:schema)
     :ok = ensure_table_create(name)
     :ok = ensure_table_copy_exists_at_node(name)
 
-    :ok = wait_for([name, :schema])
     tables = Mnesia.system_info(:local_tables)
     Logger.info("check tables: #{inspect(tables)}")
-    IO.puts("ici")
-    IO.puts("Successfully connected Mnesia to the cluster!")
+
+    Logger.info("Successfully connected Mnesia to the cluster!")
   end
 
   def ensure_schema_from_ram_to_disc_copy(name) do
@@ -149,49 +142,44 @@ defmodule MnDb do
   end
 
   def ensure_table_copy_exists_at_node(name) do
-    case Mnesia.add_table_copy(name, node(), :disc_copies) do
-      {:atomic, :ok} ->
-        Logger.info("Table #{name} added to disc at node")
-        :ok
+    with :ok <- wait_for(name) do
+      case Mnesia.add_table_copy(name, node(), :disc_copies) do
+        {:atomic, :ok} ->
+          Logger.info("Table #{name} added to disc at node")
+          :ok
 
-      {:aborted, {:already_exists, _name, _node}} ->
-        Logger.info("Table #{name} exists, already on disc at node")
-        :ok
+        {:aborted, {:already_exists, _name, _node}} ->
+          Logger.info("Table #{name} exists, already on disc at node")
+          :ok
 
-      {:error, {:already_exists, name, node, :disc_copies}} ->
-        Logger.info("Table #{name} already on disc for #{node}")
-        :ok
-        # {:aborted, {:already_exists, _name}} ->
-        #   Logger.info("Table #{name} exists")
-        #   :ok
+        {:error, {:already_exists, name, node, :disc_copies}} ->
+          Logger.info("Table #{name} already on disc for #{node}")
+          :ok
+      end
     end
   end
 
   def ensure_table_create(name) do
     table = Mnesia.create_table(name, attributes: [:post_id, :data])
 
-    case table do
-      {:atomic, :ok} ->
-        with :ok <- wait_for(name) do
+    with :ok <- wait_for(name) do
+      case table do
+        {:atomic, :ok} ->
+          # with :ok <- wait_for(name) do
           Logger.info("Table #{name} created")
           :ok
-        end
 
-      {:aborted, {:already_exists, name}} ->
-        with :ok <- wait_for(name) do
+        {:aborted, {:already_exists, name}} ->
           Logger.info("Table #{name} exists")
           :ok
-        end
-
-      {:aborted, reason} ->
-        {:error, reason}
+      end
     end
   end
 
   def wait_for(name) do
-    case Mnesia.wait_for_tables(name, 100) do
+    case Mnesia.wait_for_tables([name], 100) do
       :ok -> :ok
-      _ -> wait_for(name)
+      {:timeout, _name} -> wait_for(name)
     end
   end
 
