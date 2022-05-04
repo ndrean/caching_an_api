@@ -49,23 +49,21 @@ defmodule Cache do
   def init(opts) do
     store = opts[:store]
     ets_table = opts[:ets_table]
-    mn_table = opts[:mn_table]
+    m_table = opts[:mn_table]
 
     # subscribe to node changes
     :ok = :net_kernel.monitor_nodes(true)
 
-    # init the ETS store
-    case et = EtsDb.setup(ets_table) do
-      _ -> Logger.info("Ets cache up: #{et}")
-    end
+    # init the ETS store is made async with continue
+    send(self(), :setup_ets)
 
     state = %{
       ets_table: ets_table,
-      m_table: mn_table,
-      store: store,
-      cache_on: opts[:cache_on]
+      m_table: m_table,
+      store: store
     }
 
+    # {:continue, :setup_ets}
     {:ok, state}
   end
 
@@ -92,7 +90,7 @@ defmodule Cache do
           end
 
         nil ->
-          nil
+          state[key]
       end
 
     {:reply, cache, state}
@@ -102,22 +100,23 @@ defmodule Cache do
 
   @impl true
   def handle_cast({:put, key, data}, state) do
-    %{ets_table: ets_table, m_table: m_table, store: store, cache_on: cache_on} = state
+    %{ets_table: ets_table, m_table: m_table, store: store} = state
 
-    if cache_on do
+    new_state =
       case store do
         :ets ->
           Ets.insert(ets_table, {key, data})
+          state
 
         :mn ->
           case MnDb.write(m_table, key, data) do
-            {:atomic, :ok} -> :ok
+            {:atomic, :ok} -> state
             _ -> :aborted
           end
-      end
-    end
 
-    new_state = Map.put(state, key, data)
+        nil ->
+          Map.put(state, key, data)
+      end
 
     {:noreply, new_state}
   end
@@ -132,20 +131,43 @@ defmodule Cache do
     {:noreply, new_state}
   end
 
-  @impl true
-  def handle_info({:nodeup, node}, %{m_table: m_table} = state) do
-    Logger.info("Detected new node #{inspect(node)}")
+  # @impl true
+  # def handle_continue(:setup_ets, %{ets_table: ets_table} = state) do
+  #   case et = EtsDb.setup(ets_table) do
+  #     _ -> Logger.info("Ets cache up: #{et}")
+  #   end
 
-    Process.sleep(1500)
+  #   {:noreply, state}
+  # end
+
+  @impl true
+  def handle_info(:setup_ets, %{ets_table: ets_table} = state) do
+    case et = EtsDb.setup(ets_table) do
+      _ -> Logger.info("Ets cache up: #{et}")
+    end
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:mnesia_system_event, message}, state) do
+    Logger.info("#{inspect(message)}")
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:nodeup, _node}, %{m_table: m_table} = state) do
+    # Logger.info("Detected new node #{inspect(node)}")
+
+    Process.sleep(100)
     MnDb.connect_mnesia_to_cluster(m_table)
 
     {:noreply, state}
   end
 
   @impl true
-  def handle_info({:nodedown, node}, state) do
-    Logger.info("Node disconnected: #{inspect(node)}")
-
+  def handle_info({:nodedown, _node}, state) do
+    # Logger.info("Node disconnected: #{inspect(node)}")
     MnDb.update_mnesia_nodes()
 
     {:noreply, state}

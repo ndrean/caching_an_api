@@ -47,75 +47,57 @@ defmodule MnDb do
   @doc """
   Give that `name = :mcache` is the name of the table, we do:
 
-  1. starting Mnesia with `MnDb.ensure_start(name)`
+  1. start Mnesia with `MnDb.ensure_start()`
 
   2. connect new node b@node to the `Node.list()` with `MnDb.update_mnesia_nodes()`
 
-  3. To make new the new node b capable of storing disc copies,
-  we need to change the schema table type on b from "ram_copies"
-  to "disc_copies" with `change_table_copy_type`. We use `MnDb.ensure_table_from_ram_to_disc_copy(:schema)`
+  3. To make new the new node b capable of storing disc copies, we need to change the schema table type on b from "ram_copies" to "disc_copies" with `change_table_copy_type`. We use `MnDb.ensure_table_from_ram_to_disc_copy(:schema)`
 
-  4. To create the table, you use `create_table` and specify the attributes of the table.
+  4. To create the table and make a disc copy, you use `create_table` and specify the attributes of the table with `disc_copies: [node()]
 
-  4. b@node only has a copy of the schema at this point.
-  To copy all the tables from a@node to b@node and maintain table types,
-  you can run `add_table_copy`, or `MnDb.ensure_table_copy_exists_at_node(name)`.
+  5. b@node only has a copy of the schema at this point. To copy all the tables from a@node to b@node and maintain table types, you can run `add_table_copy`, or `MnDb.ensure_table_copy_exists_at_node(name)`.
   """
 
   def connect_mnesia_to_cluster(name) do
-    Logger.info("start setup")
+    # Logger.info("Start setup")
 
-    with :ok <- ensure_start(name),
+    with :ok <- ensure_start(),
          :ok <- update_mnesia_nodes(),
          :ok <- ensure_table_from_ram_to_disc_copy(:schema),
-         :ok <- ensure_table_copy_exists_at_node(:schema),
          :ok <- ensure_table_create(name),
          :ok <- ensure_table_copy_exists_at_node(name) do
-      node_db_folder = Application.get_env(:mnesia, :dir) |> to_string
-      Logger.info("A local copy of the data exists at: #{node_db_folder}")
-      Logger.info("Successfully connected Mnesia to the cluster!")
+      {:ok, _name, _node} = activate_checkpoint(name)
+      # node_db_folder = Application.get_env(:mnesia, :dir) |> to_string
+      # Logger.info("A local copy of the data exists at: #{node_db_folder}")
+      # Logger.info("Successfully connected Mnesia to the cluster!")
     end
   end
 
-  def ensure_start(name) do
-    Mnesia.start()
+  def ensure_start() do
+    :ok = Mnesia.start()
 
-    case :mnesia.system_info(:is_running) do
-      :yes ->
-        Logger.info("Mnesia UP")
-        :ok
+    Mnesia.subscribe(:system)
 
-      :no ->
-        {:error, :mnesia_unexpectedly_stopped}
-
-      :starting ->
-        Process.sleep(200)
-        ensure_start(name)
-    end
+    :ok
   end
 
   @doc """
-  We declare fresh new nodes to Mnesia.
-  This function must only be used to connect to newly started RAM nodes
-  with an empty schema.
-  If, for example, this function is used after the network has been partitioned,
-  it can lead to inconsistent tables.
+  We declare fresh new nodes to Mnesia. This function must only be used to connect to newly started RAM nodes with an empty schema. If, for example, this function is used after the network has been partitioned, it can lead to inconsistent tables.
   """
   def update_mnesia_nodes() do
     case Mnesia.change_config(:extra_db_nodes, Node.list()) do
       {:ok, [_ | _]} ->
-        _nodes = Mnesia.system_info(:db_nodes)
         running_nodes = Mnesia.system_info(:running_db_nodes)
         Logger.info("Running nodes: #{inspect(running_nodes)}")
         :ok
 
       {:ok, []} ->
-        Logger.info("Initialze Node List")
+        # Logger.info("Initialze Node List")
         :ok
 
-      {:error, {:merge_schema_failed, msg}} ->
+      {:error, {:merge_schema_failed, _msg}} ->
         Logger.info("merge_schema_failed")
-        Logger.info("#{inspect(msg)}")
+        # Logger.info("#{inspect(msg)}")
         :error
 
       {:error, reason} ->
@@ -127,15 +109,15 @@ defmodule MnDb do
     with :ok <- wait_for(name) do
       case Mnesia.change_table_copy_type(name, node(), :disc_copies) do
         {:atomic, :ok} ->
-          Logger.info("#{name} created")
+          # Logger.info("#{name} created")
           :ok
 
         {:aborted, {:already_exists, _, _, _}} ->
-          Logger.info("#{name} already exists on disc")
+          # Logger.info("#{name} already exists on disc")
           :ok
 
         {:error, {:already_exists, _table, _node, :disc_copies}} ->
-          Logger.info("error #{name} already")
+          # Logger.info("error #{name} already")
           :ok
 
         {:aborted, reason} ->
@@ -149,11 +131,11 @@ defmodule MnDb do
 
     case table do
       {:atomic, :ok} ->
-        Logger.info("Table #{name} created")
+        # Logger.info("Table #{name} created")
         :ok
 
-      {:aborted, {:already_exists, name}} ->
-        Logger.info("Table #{name} exists")
+      {:aborted, {:already_exists, _name}} ->
+        # Logger.info("Table #{name} exists")
         :ok
 
       {:aborted, reason} ->
@@ -162,21 +144,21 @@ defmodule MnDb do
   end
 
   @doc """
-  This one is needed to disc-copy the "remote" data table to the new node
+  This one is needed to disc-copy the "remote" data table to the new node.
   """
   def ensure_table_copy_exists_at_node(name) do
     with :ok <- wait_for(name) do
       case Mnesia.add_table_copy(name, node(), :disc_copies) do
         {:atomic, :ok} ->
-          Logger.info("Remote table #{name} added to disc at node")
+          # Logger.info("Remote table #{name} added to disc at node")
           :ok
 
         {:aborted, {:already_exists, _name, _node}} ->
-          Logger.info("Table #{name} already on disc at node")
+          # Logger.info("Table #{name} already on disc at node")
           :ok
 
         {:error, {:already_exists, _table, _node, :disc_copies}} ->
-          Logger.info("error #{name} already")
+          # Logger.info("error #{name} already")
           :ok
       end
     end
@@ -189,54 +171,40 @@ defmodule MnDb do
     end
   end
 
-  # def ensure_schema_create(name) do
-  #   case Mnesia.create_schema([node()]) do
-  #     {:aborted, {:already_exists, ^name}} ->
-  #       Logger.info("aborted local schema exists")
-  #       :ok
-
-  #     {:error, {_node, {:already_exists, __node}}} ->
-  #       Logger.info("node local schema exists")
-  #       :ok
-
-  #     {:error, reason} ->
-  #       {:error, reason}
-
-  #     :ok ->
-  #       :ok
-  #   end
-  # end
+  def activate_checkpoint(name) do
+    {:ok, _name, _node} = Mnesia.activate_checkpoint(max: [name])
+  end
 
   ##################################
-  def delete_schema do
-    Mnesia.delete_schema([node()])
-  end
+  # def delete_schema do
+  #   Mnesia.delete_schema([node()])
+  # end
 
-  def delete_schema_copy(name) do
-    Mnesia.stop()
-    ensure_delete_schema(name)
-  end
+  # def delete_schema_copy(name) do
+  #   Mnesia.stop()
+  #   ensure_delete_schema(name)
+  # end
 
-  def ensure_delete_schema(name) do
-    case :mnesia.system_info(:is_running) do
-      :yes ->
-        Mnesia.stop()
-        Process.sleep(1000)
-        ensure_delete_schema(name)
+  # def ensure_delete_schema(name) do
+  #   case :mnesia.system_info(:is_running) do
+  #     :yes ->
+  #       Mnesia.stop()
+  #       Process.sleep(1000)
+  #       ensure_delete_schema(name)
 
-      :no ->
-        with {:atomic, :ok} <- Mnesia.del_table_copy(name, node()) do
-          :ok
-        end
+  #     :no ->
+  #       with {:atomic, :ok} <- Mnesia.del_table_copy(name, node()) do
+  #         :ok
+  #       end
 
-      :starting ->
-        {:error, :mnesia_unexpectedly_starting}
+  #     :starting ->
+  #       {:error, :mnesia_unexpectedly_starting}
 
-      :stopping ->
-        Process.sleep(1_000)
-        ensure_delete_schema(name)
-    end
-  end
+  #     :stopping ->
+  #       Process.sleep(1_000)
+  #       ensure_delete_schema(name)
+  #   end
+  # end
 
   ######################################
   @doc """

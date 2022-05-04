@@ -12,18 +12,17 @@ defmodule CachingAnApi.Application do
     opts = [strategy: :one_for_one, name: CachingAnApi.Supervisor]
 
     cache_opt = [
-      store: :mn,
-      cache_on: true,
-      mn_table: :mcache,
-      ets_table: :ecache
+      store: Application.get_env(:caching_an_api, :store),
+      mn_table: Application.get_env(:caching_an_api, :mn_table),
+      ets_table: Application.get_env(:caching_an_api, :ets_table)
     ]
 
     # list to be supervised
     [
-      # start the cache
-      {Cache, cache_opt},
       # start libcluster
-      {Cluster.Supervisor, [topologies, [name: CachingAnApi.ClusterSupervisor]]}
+      {Cluster.Supervisor, [topologies, [name: CachingAnApi.ClusterSupervisor]]},
+      # start the cache
+      {Cache.Supervisor, cache_opt}
     ]
     |> Supervisor.start_link(opts)
   end

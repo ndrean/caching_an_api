@@ -7,6 +7,9 @@ defmodule EtsDb do
   The Ets store is instanciated here.
   """
   def setup(table_name) do
-    :ets.new(table_name, [:ordered_set, :public, :named_table, read_concurrency: true])
+    :ets.new(
+      table_name,
+      [:ordered_set, :public, :named_table, read_concurrency: true, write_concurrency: true]
+    )
   end
 end

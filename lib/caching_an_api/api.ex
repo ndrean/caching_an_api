@@ -1,7 +1,7 @@
 defmodule Api do
   alias Cache
   @url "https://jsonplaceholder.typicode.com/todos/"
-  @range 10..20
+  # @range 20..30
   # @cache true
 
   def fetch(i, f) do
@@ -28,9 +28,8 @@ defmodule Api do
   end
 
   # 1-nocache #2-cached
-  @spec enum_yield_many :: list
-  def enum_yield_many do
-    @range
+  def enum_yield_many(range) do
+    range
     |> Enum.map(fn i ->
       Task.async(fn -> fetch(i, &sync/1) end)
     end)
@@ -39,16 +38,16 @@ defmodule Api do
   end
 
   # 2-nocache #4-cached
-  def asynced_stream do
-    @range
+  def asynced_stream(range) do
+    range
     |> Task.async_stream(fn i -> fetch(i, &sync/1) end)
     |> Enum.map(fn {_status, res} -> res end)
   end
 
   # 4-nocache #4-cached
   # yield_many sends a tuple {task, result}
-  def yield_many_asynced_stream do
-    @range
+  def yield_many_asynced_stream(range) do
+    range
     |> Stream.map(fn i ->
       Task.async(fn -> fetch(i, &sync/1) end)
     end)
@@ -57,8 +56,8 @@ defmodule Api do
   end
 
   # 3-nocache #1-cached
-  def stream_synced do
-    @range
+  def stream_synced(range) do
+    range
     |> Stream.map(fn i -> fetch(i, &async/1) end)
     |> Enum.map(fn {_status, res} -> res end)
   end
@@ -73,7 +72,6 @@ defmodule Api do
           |> Poison.decode!()
           |> Map.put("was_cached", false)
 
-        # if @cache, do:
         Cache.put(i, body)
         {:ok, {i, %{response: body}}}
 
@@ -92,7 +90,6 @@ defmodule Api do
           |> Poison.decode!()
           |> Map.put("was_cached", false)
 
-        # if @cache, do:
         Cache.put(i, body)
         {i, %{response: body}}
 

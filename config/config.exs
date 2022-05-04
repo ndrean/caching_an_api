@@ -3,6 +3,11 @@ import Config
 config :mnesia,
   dir: 'mndb_#{Node.self()}'
 
+config :caching_an_api,
+  store: :mn,
+  mn_table: :mcache,
+  ets_table: :ecache
+
 config :libcluster,
   debug: false,
   topologies: [
