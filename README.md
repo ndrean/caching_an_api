@@ -3,7 +3,7 @@
 We cache the responses to HTTP calls with a GenServer, the Ets data store and the Mnesia database in a distributed cluster.
 
 There is a module Api for performing HTTP requests that calls a Cache module.
-The Cache module is a GenServer.
+The Cache module is a GenServer. For simplicity, it implements state, Mnesia and Ets whilst only one mode runs at a time; the selection of the store is declared `store: type` in the config, with the type of `:mn` or `:ets` or nothing (for state).
 
 ## Testing Ets vs Mnesia: **test** branch
 
@@ -15,20 +15,26 @@ Basicaly, you could just use a GenServer to cache the HTTP requests as state. We
 Furthermore, we can react to e.g. process calls with `handle_info`. This will be the case in the cluster mode when the Erlang VM will detect a node event. We will instanciate a copy of Mnesia from a `handle_info`.
 A GenServer can be supervised but the data is lost.
 
-- ETS
-It is an in-build in-memory key-value database localized in a node and linked to the health of the calling process in a node: it lives and dies with the GenServer. The data store is **not distributed**: other nodes within a cluster can't access to it.
+- [ETS](https://www.erlang.org/doc/man/ets.html)
+It is an in-build in-memory key-value database localized in a node and linked to the health of the calling process in a node: it lives and dies with an individual process.
+The data store is **not distributed**: other nodes within a cluster can't access to it.
 Data is saved with tuples and there is no need to serialize values.
 Check for the improved [ConCache](https://github.com/sasa1977/con_cache) with TTL support.
 
-> What's the point of using Ets? It allows shared, concurrent access to data outside of a process within a node. However, it's life shelf is fully dependent on the managing GenServer.
+> What's the point of using Ets? It allows shared, concurrent access to data. When using the flag `:public`, we can use it outside of the process that created it within a node. However, it's life shelf is fully dependent on the managing GenServer.
 
-- Mnesia
+- [Mnesia](http://erlang.org/documentation/doc-5.2/pdf/mnesia-4.1.pdf)
 Mnesia is an in-build distributed in-memory and disc persisted (optional) database build for concurrency. It work both in memory (with Ets) and on disc . As Ets, it stores tuples.
 In Mnesia, every action needs to be wrapped within a **transaction**. If something goes wrong with executing a transaction, it will be rolled back and nothing will be saved on the database.
 
+- storage capacity:
+From the [doc](https://www.erlang.org/faq/mnesia.html), it is indicated that:
+  - for ram_copies and disc_copies, the entire table is kept in memory, so data size is limited by available RAM.
+  - for disc_copies tables, the entire table needs to be read from disk to memory on node startup, which can take a long time for large table.
+
 - `:atomic` means that all operations should occur or no operations should occur in case of an error.
 
-> What's the point of using Mnesia? It works in a cluster, both in RAM and disc. The data are replicated on each node, available concurrently and persisted.
+> What's the point of using Mnesia? It works in a cluster, both in RAM and disc. The data are replicated on each node, available concurrently and persisted. Furthermoe, if you need to keep a database that will be used by multiple processes and/or nodes, using Mnesia means you don't have to write your own access controls.
 
 ## Connecting machines
 
@@ -86,6 +92,10 @@ ttab iex --sname a -S mix && ttab iex --sname b -S mix
 ```
 
 ## Ets
+
+Elixir school [Ets](https://elixirschool.com/en/lessons/storage/ets)
+
+<https://sayan.xyz/posts/elixir-erlang-and-ets-alchemy>
 
 The startup is straightforward. Just use `ets.new`. Then you may use `ets.lookup` and `ets.insert` to respectively "get" and "put".
 

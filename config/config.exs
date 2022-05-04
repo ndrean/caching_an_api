@@ -4,7 +4,7 @@ config :mnesia,
   dir: 'mndb_#{Node.self()}'
 
 config :caching_an_api,
-  store: :mn,
+  store: :ets,
   mn_table: :mcache,
   ets_table: :ecache
 
