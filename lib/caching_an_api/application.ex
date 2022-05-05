@@ -3,6 +3,8 @@ defmodule CachingAnApi.Application do
 
   use Application
 
+  # require EtsDb
+
   @impl true
   def start(_type, _args) do
     import Supervisor.Spec, warn: false
@@ -17,12 +19,20 @@ defmodule CachingAnApi.Application do
       ets_table: Application.get_env(:caching_an_api, :ets_table)
     ]
 
+    IO.puts("ici #{cache_opt[:ets_table]}")
+
     # list to be supervised
     [
       # start libcluster
       {Cluster.Supervisor, [topologies, [name: CachingAnApi.ClusterSupervisor]]},
+      {Ets.Supervisor, [ets_table: cache_opt[:ets_table]]},
       # start the cache
       {Cache.Supervisor, cache_opt}
+
+      # %{
+      #   id: EtsDb,
+      #   start: {EtsDb, :start_link, [[cache_opt[:ets_table]]]}
+      # }
     ]
     |> Supervisor.start_link(opts)
   end

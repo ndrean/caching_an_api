@@ -54,22 +54,18 @@ defmodule Cache do
     # subscribe to node changes
     :ok = :net_kernel.monitor_nodes(true)
 
-    # init the ETS store is made async with continue
-    send(self(), :setup_ets)
-
     state = %{
       ets_table: ets_table,
       m_table: m_table,
       store: store
     }
 
-    # {:continue, :setup_ets}
     {:ok, state}
   end
 
   @impl true
   def handle_call({:get, key}, _from, state) do
-    %{ets_table: ets_table, m_table: m_table, store: store} = state
+    %{m_table: m_table, store: store} = state
 
     cache =
       case store do
@@ -83,11 +79,7 @@ defmodule Cache do
           end
 
         :ets ->
-          case :ets.lookup(ets_table, key) do
-            [] -> nil
-            [{^key, data}] -> data
-            _ -> :error
-          end
+          EtsDb.get(key)
 
         nil ->
           state[key]
@@ -96,16 +88,14 @@ defmodule Cache do
     {:reply, cache, state}
   end
 
-  :mnesia.set_master_nodes(:mcache, Node.list())
-
   @impl true
   def handle_cast({:put, key, data}, state) do
-    %{ets_table: ets_table, m_table: m_table, store: store} = state
+    %{m_table: m_table, store: store} = state
 
     new_state =
       case store do
         :ets ->
-          Ets.insert(ets_table, {key, data})
+          EtsDb.put(key, data)
           state
 
         :mn ->
@@ -129,24 +119,6 @@ defmodule Cache do
 
     new_state = Map.delete(state, key)
     {:noreply, new_state}
-  end
-
-  # @impl true
-  # def handle_continue(:setup_ets, %{ets_table: ets_table} = state) do
-  #   case et = EtsDb.setup(ets_table) do
-  #     _ -> Logger.info("Ets cache up: #{et}")
-  #   end
-
-  #   {:noreply, state}
-  # end
-
-  @impl true
-  def handle_info(:setup_ets, %{ets_table: ets_table} = state) do
-    case et = EtsDb.setup(ets_table) do
-      _ -> Logger.info("Ets cache up: #{et}")
-    end
-
-    {:noreply, state}
   end
 
   @impl true

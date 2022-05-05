@@ -99,14 +99,7 @@ Elixir school [Ets](https://elixirschool.com/en/lessons/storage/ets)
 
 The startup is straightforward. Just use `ets.new`. Then you may use `ets.lookup` and `ets.insert` to respectively "get" and "put".
 
-```elixir
-def setup(table_name) do
-    :ets.new(
-      table_name,
-      [:ordered_set, :public, :named_table, read_concurrency: true, write_concurrency: true]
-    )
-  end
-```
+> To display the usage of `:public`, we made a module EtsDb as a GenServer with Supervision. This makes the Ets process independant from the Cache module. Since the table is `:public`, we can use it from any process. Tthe supervision allows the Ets to be restarted in case of problems.
 
 ## Mnesia
 
@@ -149,7 +142,7 @@ The sequence is:
 
 3. `:mnesia.create_table` where you specify the rows and also that you want a disc copy for your node. The parameter `disc_copies: [node()]` means that data is stored both on disc and in the memory.
 
-4. The disc copy directory can be specified in the `config.exs` file 
+4. The disc copy directory can be specified in the `config.exs` file.
 
 ### Distributed Mnesia startup
 
