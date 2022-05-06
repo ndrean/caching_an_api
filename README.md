@@ -1,9 +1,11 @@
 # CachingAnApi & Concurrency
 
-We cache the responses to HTTP calls with a GenServer, the Ets data store and the Mnesia database in a distributed cluster.
+We cache the responses to HTTP calls with a GenServer, the Ets data store and the Mnesia database in a distributed cluster. It only makes sense to use the state of a process or a local Ets store since this type of cache is proper to each node by nature. However, we change a field in the response on the first call, and we want to propagate the updated response to the cluster thanks to the TCP connection between each node without the need of new HTTP calls.
+
+> Other unused options here would rely on external databases, such as Redis with PubSub or Postgres with Listen/Notify. Finally, as a last option, in case you have a web interface, you can use websockets to broadcast the modification to each local instance and store it accordingly.
 
 There is a module Api for performing HTTP requests that calls a Cache module.
-You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia. Set the `store: type` with `:mn` or `:ets` or nothing (for state).
+You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia. Set the `store: type` with `:mn` or `:ets` or nothing (for the process state).
 
 Ets and Mnesia are both run in their own supervised process.
 
