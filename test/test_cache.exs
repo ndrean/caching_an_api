@@ -3,8 +3,8 @@ defmodule TestCache do
 
   test "check connection" do
     Api.fetch(1, &Api.sync/1)
-    %{"id" => val} = Cache.get(1)
-    assert val == 1
+    %{"title" => val} = Cache.get(1)
+    assert val == "delectus aut autem"
   end
 
   test "check cache" do

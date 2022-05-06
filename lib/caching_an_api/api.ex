@@ -1,8 +1,8 @@
 defmodule Api do
   alias Cache
   @url "https://jsonplaceholder.typicode.com/todos/"
-  # @range 20..30
-  # @cache true
+
+  require Logger
 
   def fetch(i, f) do
     data = Cache.get(i)

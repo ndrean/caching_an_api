@@ -3,16 +3,16 @@
 We cache the responses to HTTP calls with a GenServer, the Ets data store and the Mnesia database in a distributed cluster.
 
 There is a module Api for performing HTTP requests that calls a Cache module.
-The Cache module is a GenServer. For simplicity, it implements state, Mnesia and Ets whilst only one mode runs at a time; the selection of the store is declared `store: type` in the config, with the type of `:mn` or `:ets` or nothing (for state).
+You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia. Set the `store: type` with `:mn` or `:ets` or nothing (for state).
 
-## Testing Ets vs Mnesia: **test** branch
+Ets and Mnesia are both run in their own supervised process.
 
- It instanciates the two embedded Erlang stores,  Ets and Mnesia. It reacts to `get`and `put` calls.
-Mnesia is wrapped into it's own module.
+## The stores
+
+We have 3 choices to handle state:
 
 - GenServer:
-Basicaly, you could just use a GenServer to cache the HTTP requests as state. We have clients functions and server-side callbacks. State is passed and modifed with corresponding `handle_call` and `handle_cast` to the client functions.
-Furthermore, we can react to e.g. process calls with `handle_info`. This will be the case in the cluster mode when the Erlang VM will detect a node event. We will instanciate a copy of Mnesia from a `handle_info`.
+Basicaly, you could just use a GenServer to cache the HTTP requests as state. We have clients functions and server-side callbacks. State is passed and modifed with corresponding `handle_call` and `handle_cast` to the client functions. Furthermore, we can react to e.g. process calls with `handle_info`. This will be the case in the cluster mode when the Erlang VM will detect a node event. We will instanciate a copy of Mnesia from a `handle_info`.
 A GenServer can be supervised but the data is lost.
 
 - [ETS](https://www.erlang.org/doc/man/ets.html)
@@ -36,6 +36,8 @@ From the [doc](https://www.erlang.org/faq/mnesia.html), it is indicated that:
 
 > What's the point of using Mnesia? It works in a cluster, both in RAM and disc. The data are replicated on each node, available concurrently and persisted. Furthermoe, if you need to keep a database that will be used by multiple processes and/or nodes, using Mnesia means you don't have to write your own access controls.
 
+A [word about scalability performance of Mnesia](http://www.dcs.gla.ac.uk/~amirg/publications/DE-Bench.pdf) and [here](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang) and [Erlang nodes](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang).
+
 ## Connecting machines
 
 From **code**, if you want to connect two machines "a@node" and "b@node" with respective IP of 192.168.0.1 and 192.168.0.2, then **within code** you would do:
@@ -56,11 +58,17 @@ From an **IEX** session, use the flag `--sname` (for short name) and it will ass
 ```bash
 $ iex --sname a -S mix
 #iex> iex --sname a --erl "-connect_all false" --cookie cookie_s -S  mix
+```
 
-#or
+or
 
+```bash
 iex> iex --name a@127.0.0.1  -S mix
+[...{:mnesia_up, :"a@127.0.0.1"}...]
 iex> iex --name b@127.0.0.1  -S mix
+[...]
+iex(a@127.0.0.1)> :net.ping(:"b@127.0.0.1")
+:pong
 ```
 
 or with the compiled code:
@@ -78,17 +86,20 @@ On MacOS, `chmod +x` the following:
 
 ```bash
 #! /bin/bash
-
-osascript -e 'tell application "Terminal" to do script "iex --sname a -S mix"' \
-&& osascript -e 'tell application "Terminal" to do script "iex --sname b -S mix"' \
-&& osascript -e 'tell application "Terminal" to do script "iex --sname c -S mix"' \
-&& osascript -e 'tell application "Terminal" to do script "iex --sname d -S mix"'
+for i in a b c d
+do
+    osascript -e "tell application \"Terminal\" to do script \"iex --sname "$i" -S mix\""
+done
 ```
 
 Alternatively, use [ttab](https://www.npmjs.com/package/ttab)
 
 ```bash
-ttab iex --sname a -S mix && ttab iex --sname b -S mix
+host="@127.0.0.1"
+for i in a1 b1 c1
+do
+  ttab iex name "$i$host" -S mix
+end
 ```
 
 ## Ets
@@ -102,6 +113,15 @@ The startup is straightforward. Just use `ets.new`. Then you may use `ets.lookup
 > To display the usage of `:public`, we made a module EtsDb as a GenServer with Supervision. This makes the Ets process independant from the Cache module. Since the table is `:public`, we can use it from any process. Tthe supervision allows the Ets to be restarted in case of problems.
 
 ## Mnesia
+
+### Configuration
+
+All you need is to give **names** to tables and a **folder location** for each node for the disc copies.
+
+> the documentation says that "the directory must be UNIQUE for each node. "Two nodes must never share the same directory".
+
+You can add a node specific name in the "config/confi.exs" file. For example: `config :mnesia, dir: 'mndb_#{Node.self()}'`. The "config/config.exs" is used at **build time**, before compilation and dependencies loading).
+If the folder doesn't exist, it will be created.
 
 ### Sources
 
@@ -122,13 +142,6 @@ Mnesia can be started in code with `:mnesia.start()`. We can add `:mnesia` in th
 ### Mnesia system event handler
 
 We use the Mnesia system event handler by declaring `:mnesia.subscribe(:system)`. We have a `handle_info` call in the Cache module to log the message.
-
-### Disc persisted folder
-
-> the documentation says that "the directory must be UNIQUE for each node. "Two nodes must never share the same directory".
-
-You can add a node specific name in the "config/confi.exs" file. For example: `config :mnesia, dir: 'mndb_#{Node.self()}'`. The "config/config.exs" is used at **build time**, before compilation and dependencies loading).
-If the folder doesn't exist, it will be created.
 
 ### Single node mode startup
 
@@ -270,7 +283,7 @@ To ensure that there are no race conditions, you can use locks.
 
 If someone has a write lock, no one can acquire either a read lock or a write lock at the same item.
 
-## Cluster creation : **Master** branch
+## Cluster creation
 
 The Erlang VM creates single TCP connections between nodes. For the clusterisation, you can use use `libcluster`:
 

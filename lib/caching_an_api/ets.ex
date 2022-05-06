@@ -1,6 +1,7 @@
 defmodule EtsDb do
   use GenServer
   require Logger
+  alias :ets, as: Ets
 
   @moduledoc """
   This module contains the setup of an Ets table. It is used by the Cache module.
@@ -16,7 +17,7 @@ defmodule EtsDb do
 
   def init(opts) do
     name =
-      :ets.new(
+      Ets.new(
         opts[:ets_table],
         [:ordered_set, :public, :named_table, read_concurrency: true, write_concurrency: true]
       )
@@ -35,7 +36,7 @@ defmodule EtsDb do
 
   def handle_call({:get, key}, _from, %{ets_table: name} = state) do
     return =
-      case :ets.lookup(name, key) do
+      case Ets.lookup(name, key) do
         [] -> nil
         [{^key, data}] -> data
         _ -> :error
@@ -45,7 +46,7 @@ defmodule EtsDb do
   end
 
   def handle_cast({:put, key, value}, %{ets_table: name} = state) do
-    true = :ets.insert(name, {key, value})
+    true = Ets.insert(name, {key, value})
     {:noreply, state}
   end
 end

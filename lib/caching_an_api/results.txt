@@ -28,3 +28,4 @@ enum_yield_many                   14.50
 asynced_stream                     5.84 - 2.48x slower +102.30 ms
 yield_many_asynced_stream          1.64 - 8.85x slower +541.50 ms
 stream_synced                      1.35 - 10.75x slower +672.48 ms
+

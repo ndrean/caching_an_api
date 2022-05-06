@@ -19,14 +19,16 @@ defmodule CachingAnApi.Application do
       ets_table: Application.get_env(:caching_an_api, :ets_table)
     ]
 
-    IO.puts("ici #{cache_opt[:ets_table]}")
-
     # list to be supervised
     [
       # start libcluster
       {Cluster.Supervisor, [topologies, [name: CachingAnApi.ClusterSupervisor]]},
+      # start Ets
+
       {Ets.Supervisor, [ets_table: cache_opt[:ets_table]]},
-      # start the cache
+      {MnDb.Supervisor, [mn_table: cache_opt[:mn_table]]},
+
+      # start the Cache with Mnesia
       {Cache.Supervisor, cache_opt}
 
       # %{
