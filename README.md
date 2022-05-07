@@ -19,7 +19,7 @@ Basicaly, you could just use a GenServer to cache the HTTP requests as state. We
 A GenServer can be supervised but the data is lost.
 
 - [ETS](https://www.erlang.org/doc/man/ets.html)
-It is an in-build in-memory key-value database localized in a node and it's life shelf is dependant upon the process that created it: it lives and dies with an individual process.
+It is an in-build in-memory key-value data store localized in a node and it's life shelf is dependant upon the process that created it: it lives and dies with an individual process.
 The data store is **not distributed**: other nodes within a cluster can't access to it.
 Data is saved with tuples and there is no need to serialize values.
 The default flag `:protected` means that any process can read from the Ets database whilst only the Ets process can write. It then offers shared, concurrent read access to data (meaning scaling upon the number of CPUs used).
@@ -30,16 +30,13 @@ The default flag `:protected` means that any process can read from the Ets datab
 Mnesia is an in-build distributed in-memory and optionnally node-based disc persisted database build for concurrency. It work both in memory (with Ets) and on disc. As Ets, it stores tuples. You can define tables whose structure is defined by a record type.
 In Mnesia, every action needs to be wrapped within a **transaction**. If something goes wrong with executing a transaction, it will be rolled back and nothing will be saved on the database.
 
-- storage capacity:
-From the [doc](https://www.erlang.org/faq/mnesia.html), it is indicated that:
-  - for ram_copies and disc_copies, the entire table is kept in memory, so data size is limited by available RAM.
-  - for disc_copies tables, the entire table needs to be read from disk to memory on node startup, which can take a long time for large table.
+  - storage capacity: from the [doc](https://www.erlang.org/faq/mnesia.html), it is indicated that:
+    - for ram_copies and disc_copies, the entire table is kept in memory, so data size is limited by available RAM.
+    - for disc_copies tables, the entire table needs to be read from disk to memory on node startup, which can take a long time for large table.
 
-- `:atomic` means that all operations should occur or no operations should occur in case of an error.
+  - `:atomic` means that all operations should occur or no operations should occur in case of an error.
 
-> What's the point of using Mnesia? It works in a cluster, both in RAM and disc. The data are replicated on each node, available concurrently and persisted. Furthermoe, if you need to keep a database that will be used by multiple processes and/or nodes, using Mnesia means you don't have to write your own access controls.
-
-A [word about scalability performance of Mnesia](http://www.dcs.gla.ac.uk/~amirg/publications/DE-Bench.pdf) and [here](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang) and [Erlang nodes](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang).
+> What's the point of using Mnesia? It works in a cluster, both in RAM and disc. The data are replicated on each node, available concurrently and persisted. Furthermoe, if you need to keep a database that will be used by multiple processes and/or nodes, using Mnesia means you don't have to write your own access controls. Furthermore, a [word about scalability performance of Mnesia](http://www.dcs.gla.ac.uk/~amirg/publications/DE-Bench.pdf) and [here](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang) and [here](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang).
 
 - [CRDT](https://github.com/derekkraan/delta_crdt_ex)
 DeltaCrdt implements a key/value store using concepts from Delta CRDTs. A CRDT can be used as a distributed temporary caching mechanism that is synced across our Cluster. A good introduction to [CRDT](https://moosecode.nl/blog/how_deltacrdt_can_help_write_distributed_elixir_applications).
@@ -62,20 +59,22 @@ Node.set_cookie :cookie_name
 From an **IEX** session, use the flag `--sname` (for short name) and it will assign **:"a@your-local-system-name"**. If you use instead the flag `--name`, then use **:"a@127.0.0.1"** or **:"a@example.com"**.
 
 ```bash
-$ export ERL_CRASH_DUMP > /dev/null
-$ iex --sname a -S mix
-#iex> iex --sname a --erl "-connect_all false" --cookie cookie_s -S  mix
+> iex --sname a -S mix
+> iex --sname a --cookie cookie_s -S  mix
 ```
 
 or
 
 ```bash
-iex> iex --name a@127.0.0.1  -S mix
+# Term 1
+> iex --name a@127.0.0.1  -S mix
 [...{:mnesia_up, :"a@127.0.0.1"}...]
-iex> iex --name b@127.0.0.1  -S mix
-[...]
 iex(a@127.0.0.1)> :net.ping(:"b@127.0.0.1")
 :pong
+
+# Term 2
+> iex --name b@127.0.0.1  -S mix
+[...]
 ```
 
 or with the compiled code:
@@ -92,7 +91,8 @@ or with the compiled code:
 On MacOS, `chmod +x` the following:
 
 ```bash
-#! /bin/bash
+# launcher.sh
+# ! /bin/bash
 for i in a b c d
 do
     osascript -e "tell application \"Terminal\" to do script \"iex --sname "$i" -S mix\""
@@ -111,11 +111,7 @@ end
 
 ## Ets
 
-[Elixir-lang-org: Ets](https://elixir-lang.org/getting-started/mix-otp/ets.html)
-
-[Elixir school: Ets](https://elixirschool.com/en/lessons/storage/ets)
-
-<https://sayan.xyz/posts/elixir-erlang-and-ets-alchemy>
+Some documents about the data store: [Elixir-lang-org: Ets](https://elixir-lang.org/getting-started/mix-otp/ets.html), and [Elixir school: Ets](https://elixirschool.com/en/lessons/storage/ets) and an excellent article talking about [Ets in production](https://sayan.xyz/posts/elixir-erlang-and-ets-alchemy).
 
 Some useful commands:
 
@@ -129,7 +125,7 @@ Some useful commands:
 [Info] Ets cache up: ecache
 iex> Process.whereis(EtsDb)
 #PID<0.339.0>
-iex> |> Agent.stop(:shutdown)
+iex> |> Process.exit(:shutdown)
 :ok
 [Info] Ets cache up: ecache
 iex> Process.whereis(EtsDb)
@@ -158,12 +154,7 @@ Usefull libraries:
 - [library Mnesiac](https://github.com/beardedeagle/mnesiac/blob/master/lib/mnesiac/store_manager.ex)
 - [Library Amensia](https://github.com/meh/amnesia)
 
-Other texts:
-<https://mbuffa.github.io/tips/20201111-elixir-troubleshooting-mnesia/>
-
-<https://www.welcometothejungle.com/fr/articles/redis-mnesia-distributed-database>
-
-<https://code.tutsplus.com/articles/store-everything-with-elixir-and-mnesia--cms-29821>
+Other [nice source](https://mbuffa.github.io/tips/20201111-elixir-troubleshooting-mnesia/) or [here](https://www.welcometothejungle.com/fr/articles/redis-mnesia-distributed-database) and a bit about [amensia](https://code.tutsplus.com/articles/store-everything-with-elixir-and-mnesia--cms-29821).
 
 Mnesia can be started in code with `:mnesia.start()`. We can add `:mnesia` in the MixProject application `included_application` to remove the VSCode warnings. Not adding it in `extra_application` is mandatory in single node mode since we need to create the schema before starting Mnesia.
 
