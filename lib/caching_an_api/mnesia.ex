@@ -60,7 +60,7 @@ defmodule MnDb do
   end
 
   @doc """
-  We update the knowledge o Mnesia system events.
+  We update the Mnesia cluster based on it's system events to which we subscribe.
   """
   @impl true
   def handle_info({:mnesia_system_event, message}, %{m_table: m_table} = state) do
@@ -129,6 +129,7 @@ defmodule MnDb do
   def ensure_start() do
     case Mnesia.start() do
       :ok ->
+        # Mnesia system event messaging
         Mnesia.subscribe(:system)
         :ok
 
