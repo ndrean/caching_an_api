@@ -60,10 +60,7 @@ defmodule MnDb do
   end
 
   @doc """
-  We clean the old data from the stopped node, and update the Mnesia cluster.
-  Use MNESIA SYSTEM EVENT or ERLANG MONITOR NODES
-  - first one we can react in this module with MNESIA ":mnesia_down" ,
-  - with the 2d one, this is done in the Cache module with ERLANG ":nodedown".
+  We update the knowledge o Mnesia system events.
   """
   @impl true
   def handle_info({:mnesia_system_event, message}, %{m_table: m_table} = state) do
@@ -102,15 +99,10 @@ defmodule MnDb do
 
   @doc """
   Give that `name = :mcache` is the name of the table, we do:
-
   1. start Mnesia with `MnDb.ensure_start()`
-
   2. connect new node b@node to the `Node.list()` with `MnDb.update_mnesia_nodes()`
-
   3. we ensure that the schema table is of type `disc` to allow disc-resisdent tables on the node.
-
   4. To create the table and make a disc copy, you use `create_table` and specify the attributes of the table with `disc_copies: [node()]
-
   5. b@node only has a copy of the schema at this point. To copy all the tables from a@node to b@node and maintain table types, you can run `add_table_copy`, or `MnDb.ensure_table_copy_exists_at_node(name)`.
   """
 
