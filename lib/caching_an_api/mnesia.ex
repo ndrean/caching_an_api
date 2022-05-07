@@ -107,7 +107,7 @@ defmodule MnDb do
   """
 
   def connect_mnesia_to_cluster(name) do
-    with {:start, :ok} <- {:start, :ok = ensure_start()},
+    with {:start, :ok} <- {:start, ensure_start()},
          {:update_nodes, :ok} <- {:update_nodes, update_mnesia_nodes()},
          {:disc_schema, :ok} <-
            {:disc_schema, ensure_table_from_ram_to_disc_copy(:schema)},
