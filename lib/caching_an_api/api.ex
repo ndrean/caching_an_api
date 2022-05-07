@@ -27,7 +27,7 @@ defmodule Api do
     end
   end
 
-  # 1-nocache #2-cached
+  # 2
   def enum_yield_many(range) do
     range
     |> Enum.map(fn i ->
@@ -37,7 +37,7 @@ defmodule Api do
     |> Enum.map(fn {_status, res} -> res end)
   end
 
-  # 2-nocache #4-cached
+  # 4
   def asynced_stream(range) do
     range
     |> Task.async_stream(fn i -> fetch(i, &sync/1) end)
@@ -55,7 +55,7 @@ defmodule Api do
     |> Enum.map(fn {_task, res} -> res end)
   end
 
-  # 3-nocache #1-cached
+  # 1
   def stream_synced(range) do
     range
     |> Stream.map(fn i -> fetch(i, &async/1) end)

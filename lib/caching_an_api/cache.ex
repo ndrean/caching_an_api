@@ -60,6 +60,9 @@ defmodule Cache do
         :ets ->
           EtsDb.get(key)
 
+        :dcrdt ->
+          nil
+
         nil ->
           state[key]
       end
@@ -79,6 +82,9 @@ defmodule Cache do
           MnDb.write(key, data)
           state
 
+        :dcrt ->
+          nil
+
         nil ->
           Map.put(state, key, data)
       end
@@ -93,10 +99,9 @@ defmodule Cache do
 
   @impl true
   def handle_info({:nodedown, _node}, state) do
-    ##  reacting with ERLANG MONITOR NODE ":nodedown", alternatively, this can be implement
-    # with MNESIA SYSTEM EVENT on ":mnesia_down"
-    # MnDb.update_nodes()
-    # MnDb.remove_old_node_table(node) <- can be placed in the Mnesia module reacting with Mnesia system event
+    ##  reacting with ERLANG MONITOR NODE ":nodedown" in the Cache
+    # alternatively,
+    # react with MNESIA SYSTEM EVENT ":mnesia_down" in MnDb
 
     {:noreply, state}
   end

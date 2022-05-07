@@ -1,32 +1,33 @@
 # CachingAnApi & Concurrency
 
-We cache the responses to HTTP calls with a GenServer, the Ets data store and the Mnesia database in a distributed cluster. It only makes sense to use the state of a process or a local Ets store since this type of cache is proper to each node by nature. However, we change a field in the response on the first call, and we want to propagate the updated response to the cluster thanks to the TCP connection between each node without the need of new HTTP calls.
+We cache the responses to HTTP calls with a GenServer, an Ets data store and a Mnesia database in the case of a distributed cluster and a CRDT solution.
+It would only make sense to use the state of a process or a local Ets store to cache HTTP calls since it is proper to each node by nature. However, we change a field in the response on the first call. We can propagate the updated response to the other nodes in cluster thanks to the TCP connection between each node, so that we save on new HTTP calls.
 
-> Other unused options here would rely on external databases, such as Redis with PubSub or Postgres with Listen/Notify. Finally, as a last option, in case you have a web interface, you can use websockets to broadcast the modification to each local instance and store it accordingly.
+> Other unused options here would rely on external databases, such as Redis with PubSub or Postgres with Listen/Notify.
 
-There is a module Api for performing HTTP requests that calls a Cache module.
-You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia. Set the `store: type` with `:mn` or `:ets` or nothing (for the process state).
+There is a supervised module Api for performing HTTP requests that calls a Cache module.
+You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia. Set the `store: type` with `:mn` or `:ets` or `crdt` or nothing (for the process state).
 
 Ets and Mnesia are both run in their own supervised process.
 
 ## The stores
 
-We have 3 choices to handle state:
+We have 4 choices to handle state:
 
 - GenServer:
-Basicaly, you could just use a GenServer to cache the HTTP requests as state. We have clients functions and server-side callbacks. State is passed and modifed with corresponding `handle_call` and `handle_cast` to the client functions. Furthermore, we can react to e.g. process calls with `handle_info`. This will be the case in the cluster mode when the Erlang VM will detect a node event. We will instanciate a copy of Mnesia from a `handle_info`.
+Basicaly, you could just use a GenServer to cache the HTTP requests as state. We have clients functions and server-side callbacks. State is passed and modifed with corresponding `handle_call` and `handle_cast` to the client functions. Furthermore, we can react to e.g. process calls with `handle_info`. This will be the case in the cluster mode when the Erlang VM will detect a node event.
 A GenServer can be supervised but the data is lost.
 
 - [ETS](https://www.erlang.org/doc/man/ets.html)
-It is an in-build in-memory key-value database localized in a node and linked to the health of the calling process in a node: it lives and dies with an individual process.
+It is an in-build in-memory key-value database localized in a node and it's life shelf is dependant upon the process that created it: it lives and dies with an individual process.
 The data store is **not distributed**: other nodes within a cluster can't access to it.
 Data is saved with tuples and there is no need to serialize values.
-Check for the improved [ConCache](https://github.com/sasa1977/con_cache) with TTL support.
+The default flag `:protected` means that any process can read from the Ets database whilst only the Ets process can write. It then offers shared, concurrent read access to data (meaning scaling upon the number of CPUs used).
 
-> What's the point of using Ets? It allows shared, concurrent access to data. When using the flag `:public`, we can use it outside of the process that created it within a node. However, it's life shelf is fully dependent on the managing GenServer.
+> Check for the improved [ConCache](https://github.com/sasa1977/con_cache) with TTL support.
 
 - [Mnesia](http://erlang.org/documentation/doc-5.2/pdf/mnesia-4.1.pdf)
-Mnesia is an in-build distributed in-memory and disc persisted (optional) database build for concurrency. It work both in memory (with Ets) and on disc . As Ets, it stores tuples.
+Mnesia is an in-build distributed in-memory and optionnally node-based disc persisted database build for concurrency. It work both in memory (with Ets) and on disc. As Ets, it stores tuples. You can define tables whose structure is defined by a record type.
 In Mnesia, every action needs to be wrapped within a **transaction**. If something goes wrong with executing a transaction, it will be rolled back and nothing will be saved on the database.
 
 - storage capacity:
@@ -40,12 +41,15 @@ From the [doc](https://www.erlang.org/faq/mnesia.html), it is indicated that:
 
 A [word about scalability performance of Mnesia](http://www.dcs.gla.ac.uk/~amirg/publications/DE-Bench.pdf) and [here](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang) and [Erlang nodes](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang).
 
+- [CRDT](https://github.com/derekkraan/delta_crdt_ex)
+DeltaCrdt implements a key/value store using concepts from Delta CRDTs. A CRDT can be used as a distributed temporary caching mechanism that is synced across our Cluster. A good introduction to [CRDT](https://moosecode.nl/blog/how_deltacrdt_can_help_write_distributed_elixir_applications).
+
 ## Connecting machines
 
 From **code**, if you want to connect two machines "a@node" and "b@node" with respective IP of 192.168.0.1 and 192.168.0.2, then **within code** you would do:
 
 ```elixir
-# on the "a@node@ macihe, 
+# on the "a@node@ machine, 
 Node.start :"a@192.168.0.1" 
 Node.set_cookie :cookie_name
 Node.connect "b@192.168.0.2"
@@ -58,6 +62,7 @@ Node.set_cookie :cookie_name
 From an **IEX** session, use the flag `--sname` (for short name) and it will assign **:"a@your-local-system-name"**. If you use instead the flag `--name`, then use **:"a@127.0.0.1"** or **:"a@example.com"**.
 
 ```bash
+$ export ERL_CRASH_DUMP > /dev/null
 $ iex --sname a -S mix
 #iex> iex --sname a --erl "-connect_all false" --cookie cookie_s -S  mix
 ```
@@ -106,13 +111,32 @@ end
 
 ## Ets
 
-Elixir school [Ets](https://elixirschool.com/en/lessons/storage/ets)
+[Elixir-lang-org: Ets](https://elixir-lang.org/getting-started/mix-otp/ets.html)
+
+[Elixir school: Ets](https://elixirschool.com/en/lessons/storage/ets)
 
 <https://sayan.xyz/posts/elixir-erlang-and-ets-alchemy>
 
-The startup is straightforward. Just use `ets.new`. Then you may use `ets.lookup` and `ets.insert` to respectively "get" and "put".
+Some useful commands:
 
-> To display the usage of `:public`, we made a module EtsDb as a GenServer with Supervision. This makes the Ets process independant from the Cache module. Since the table is `:public`, we can use it from any process. Tthe supervision allows the Ets to be restarted in case of problems.
+- creation: just use `:ets.new`
+- read/write: `:ets.lookup` and `:ets.insert` to respectively "get" and "put"
+- read all data of the table ":ecache": `:ets.tab2list(:ecache)`
+
+### Check that the EtsDb GenServer module is supervised
+
+```elixir
+[Info] Ets cache up: ecache
+iex> Process.whereis(EtsDb)
+#PID<0.339.0>
+iex> |> Agent.stop(:shutdown)
+:ok
+[Info] Ets cache up: ecache
+iex> Process.whereis(EtsDb)
+#PID<0.344.0>
+```
+
+> The Ets process is wrapped into a GenServer. It can be accessed from the Cache module or the Api module. The DnymaicSupervision allows the Ets to be restarted in case of problems.
 
 ## Mnesia
 
@@ -127,12 +151,14 @@ If the folder doesn't exist, it will be created.
 
 ### Sources
 
-The [Mnesia](http://erlang.org/documentation/doc-5.2/pdf/mnesia-4.1.pdf) documentation.
+The [Mnesia](http://erlang.org/documentation/doc-5.2/pdf/mnesia-4.1.pdf) documentation and the [Elixir school lesson](https://elixirschool.com/en/lessons/storage/mnesia). Also [LearnYouSomeErlang](https://learnyousomeerlang.com/mnesia#whats-mnesia).
 
-The [Elixir school lesson](https://elixirschool.com/en/lessons/storage/mnesia)
+Usefull libraries:
 
-Other usefull links:
+- [library Mnesiac](https://github.com/beardedeagle/mnesiac/blob/master/lib/mnesiac/store_manager.ex)
+- [Library Amensia](https://github.com/meh/amnesia)
 
+Other texts:
 <https://mbuffa.github.io/tips/20201111-elixir-troubleshooting-mnesia/>
 
 <https://www.welcometothejungle.com/fr/articles/redis-mnesia-distributed-database>
@@ -275,16 +301,6 @@ MnDb.ensure_table_copy_exists_at_node(name)
 :mnesia.system_info()
 ```
 
-### Locks
-
-To ensure that there are no race conditions, you can use locks.
-
-- `:write`, which prevents other transactions from acquiring a lock on a resource,
-
-- `:read`, which allows other nodes to obtain only `:read` locks.
-
-If someone has a write lock, no one can acquire either a read lock or a write lock at the same item.
-
 ## Cluster creation
 
 The Erlang VM creates single TCP connections between nodes. For the clusterisation, you can use use `libcluster`:
@@ -323,14 +339,6 @@ stream_synced                    2.88 K
 enum_yield_many                  1.63 K - 1.76x slower +264.55 μs
 asynced_stream                   1.02 K - 2.82x slower +633.34 μs
 yield_many_asynced_stream        1.00 K - 2.87x slower +651.90 μs
-
-- no cache
-
-Comparison:
-enum_yield_many                   11.06
-asynced_stream                     2.72 - 4.07x slower +0.28 s
-stream_synced                      0.83 - 13.33x slower +1.12 s
-yield_many_asynced_stream          0.65 - 17.02x slower +1.45 s
 
 ## Misc notes
 
