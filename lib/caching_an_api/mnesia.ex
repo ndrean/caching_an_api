@@ -20,9 +20,15 @@ defmodule MnDb do
   end
 
   #####################################################
+
+  @doc """
+  A flag is added to trigger the GenServer that runs the `terminate` callback when going down.
+  """
+
   @impl true
   def init(opts) do
     m_table = opts[:mn_table]
+
     Process.flag(:trap_exit, true)
 
     MnDb.connect_mnesia_to_cluster(m_table)
@@ -158,10 +164,10 @@ defmodule MnDb do
   end
 
   def remove_old_node_table(node) do
-    Logger.info("RMRF")
     {:ok, cwd} = File.cwd()
     path = cwd <> "/" <> "mndb_" <> to_string(node)
     {:ok, _} = File.rm_rf(path)
+    Logger.info("RMRF")
     :ok
   end
 
@@ -175,9 +181,6 @@ defmodule MnDb do
           :ok
 
         {:aborted, {:already_exists, _, _, _}} ->
-          :ok
-
-        {:error, {:already_exists, _table, _node, :disc_copies}} ->
           :ok
 
         {:aborted, reason} ->
