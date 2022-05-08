@@ -18,10 +18,15 @@ defmodule CachingAnApi.Application do
       ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache
     ]
 
+    cluster_type =
+      Application.get_env(:libcluster, :topologies)[:local_epmd][:strategy] ||
+        Application.get_env(:libcluster, :topologies)[:gossip_ex][:strategy]
+
+    Logger.notice("Config: #{inspect(cache_opt ++ [cluster_type: cluster_type])}")
+
     # start Ets with a table name
     EtsDb.init(cache_opt[:ets_table])
 
-    Logger.info("#{inspect(cache_opt)}")
     # MnUnSupervised.connect_mnesia_to_cluster(cache_opt.mn_table)
 
     # list to be supervised

@@ -22,7 +22,10 @@ defmodule MnDb do
     GenServer.cast(__MODULE__, {:write, key, data, name})
   end
 
-  def list(), do: :ets.tab2list(:mcache)
+  ### Test functions
+  def node_list(), do: GenServer.call(__MODULE__, {:node_list})
+  def data_list(), do: GenServer.call(__MODULE__, {:data_list})
+  def info(), do: :mnesia.system_info()
   #####################################################
 
   @doc """
@@ -38,17 +41,25 @@ defmodule MnDb do
     {:ok, name}
   end
 
-  @impl true
-  def handle_cast({:write, key, data, m_table}, state) do
-    case Mnesia.transaction(fn ->
-           Mnesia.write({m_table, key, data})
-         end) do
-      {:atomic, :ok} -> :ok
-      {:aborted, reason} -> {:aborted, reason}
-    end
+  #### TEST functions for rpc
 
-    {:noreply, state}
+  # GenServer.call({MnDb, :"b@127.0.0.1"}, :node_list)
+
+  @impl true
+  def handle_call({:data_list}, from, _state) do
+    reply = :ets.tab2list(:mcache)
+    # Logger.info("#{inspect(reply)}")
+    {:reply, reply, from}
   end
+
+  @impl true
+  def handle_call(:node_list, from, state) do
+    reply = Node.list()
+    Logger.info("#{inspect(from)}")
+    {:reply, reply, state}
+  end
+
+  #### END TEST functions
 
   @impl true
   def handle_call({:read, key, m_table}, _from, state) do
@@ -67,6 +78,18 @@ defmodule MnDb do
     {:reply, reply, state}
   end
 
+  @impl true
+  def handle_cast({:write, key, data, m_table}, state) do
+    case Mnesia.transaction(fn ->
+           Mnesia.write({m_table, key, data})
+         end) do
+      {:atomic, :ok} -> :ok
+      {:aborted, reason} -> {:aborted, reason}
+    end
+
+    {:noreply, state}
+  end
+
   @doc """
   We update the Mnesia cluster based on it's system events to which we subscribe.
   """
@@ -74,22 +97,31 @@ defmodule MnDb do
   def handle_info({:mnesia_system_event, message}, state) do
     case message do
       {:mnesia_down, node} ->
-        Logger.info("\u{2193}  #{node}")
+        Logger.info("\u{2193}  #{node}", ansi_color: :magenta)
 
       {:mnesia_up, node} ->
-        Logger.info("\u{2191} #{node}")
+        Logger.info("\u{2191} #{node}", ansi_color: :green)
 
       {:inconsistent_database, reason, node} ->
         Logger.critical("#{reason} at #{node}")
         # raise "partition"
-        :ok = connect_mnesia_to_cluster(state[:m_table])
+        Mnesia.stop()
+        send(__MODULE__, {:quit, {:shutdown, :network}})
+        # {:stop, {:shutdown, :network}, state}
     end
 
     {:noreply, state}
   end
 
+  def handle_info({:quit, {:shutdown, :network}}, from) do
+    Logger.warn("GS terminating on network error ")
+    # :ok = remove_old_node_table(node())
+    {:stop, :shutdown, from}
+  end
+
   def handle_info({:EXIT, _from, reason}, state) do
-    Logger.warn("exiting Mnesia GS")
+    Logger.warn("GenServer MnDb terminating at #{inspect(node())}")
+    Mnesia.stop()
     {:stop, reason, state}
   end
 
@@ -97,11 +129,11 @@ defmodule MnDb do
   This will be triggered if we run `:init.stop()` for example.
   """
   @impl true
-  def terminate(reason, _state) do
-    Logger.critical(" GenServer MnDb terminating: #{inspect(reason)}")
+  def terminate(reason, state) do
+    Logger.warn(" GenServer MnDb terminating: #{inspect(reason)}")
     System.cmd("say", ["bye to #{node() |> to_string() |> String.at(0)}"])
-    # :ok = remove_old_node_table(node())
-    :ok
+
+    {:ok, state}
   end
 
   # Node.disconnect(:"b@127.0.0.1")
@@ -119,6 +151,8 @@ defmodule MnDb do
   """
 
   def connect_mnesia_to_cluster(name) do
+    Logger.info("Starting...")
+
     with {:start, :ok} <- {:start, ensure_start()},
          {:update_nodes, :ok} <- {:update_nodes, update_mnesia_nodes()},
          {:disc_schema, :ok} <-
