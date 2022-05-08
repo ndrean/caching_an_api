@@ -1,13 +1,13 @@
-defmodule Cache do
+defmodule CacheGS do
   use GenServer
   require EtsDb
-  require MnDb
+  # require MnDb
   require Logger
 
   @doc """
   We pass config options set in the Application level and name the GenServer pid with the module name.
   """
-  def start_link(opts \\ []) do
+  def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
@@ -41,24 +41,18 @@ defmodule Cache do
     # subscribe to node changes
     :ok = :net_kernel.monitor_nodes(true)
 
-    state = %{
-      ets_table: opts[:ets_table],
-      m_table: opts[:mn_table],
-      store: opts[:store]
-    }
-
-    {:ok, state}
+    {:ok, opts}
   end
 
   @impl true
-  def handle_call({:get, key}, _from, %{store: store} = state) do
+  def handle_call({:get, key}, _from, state) do
     cache =
-      case store do
+      case state[:store] do
         :mn ->
-          MnDb.read(key)
+          MnDb.read(key, state[:mn_table])
 
         :ets ->
-          EtsDb.get(key)
+          EtsDb.get(key, state[:ets_table])
 
         :dcrdt ->
           nil
@@ -71,15 +65,15 @@ defmodule Cache do
   end
 
   @impl true
-  def handle_cast({:put, key, data}, %{store: store} = state) do
+  def handle_cast({:put, key, data}, state) do
     new_state =
-      case store do
+      case state[:store] do
         :ets ->
-          EtsDb.put(key, data)
+          EtsDb.put(key, data, state[:ets_table])
           state
 
         :mn ->
-          MnDb.write(key, data)
+          MnDb.write(key, data, state[:mn_table])
           state
 
         :dcrt ->
@@ -92,6 +86,9 @@ defmodule Cache do
     {:noreply, new_state}
   end
 
+  @doc """
+  Callback reacting to ERLANG MONITOR NODE `:nodedown` or `:nodeup` since we set `:net_kernel.monitor_nodes(true)` in the Cache module. Note that we also subscribed to Mnesia system event (with `:mnesia_down` or `:mnesia_up`). These are handled in the Mnesia module.
+  """
   @impl true
   def handle_info({:nodeup, _node}, state) do
     {:noreply, state}
@@ -99,10 +96,6 @@ defmodule Cache do
 
   @impl true
   def handle_info({:nodedown, _node}, state) do
-    ##  reacting with ERLANG MONITOR NODE ":nodedown" in the Cache
-    # alternatively,
-    # react with MNESIA SYSTEM EVENT ":mnesia_down" in MnDb
-
     {:noreply, state}
   end
 end

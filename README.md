@@ -1,33 +1,31 @@
 # CachingAnApi & Concurrency
 
-We cache the responses to HTTP calls with a GenServer, an Ets data store and a Mnesia database in the case of a distributed cluster and a CRDT solution.
-It would only make sense to use the state of a process or a local Ets store to cache HTTP calls since it is proper to each node by nature. However, we change a field in the response on the first call. We can propagate the updated response to the other nodes in cluster thanks to the TCP connection between each node, so that we save on new HTTP calls.
+As an illustration to different in-build stores, we cache the responses to HTTP calls with a GenServer, an Ets data store and a Mnesia database in the case of a distributed cluster and a CRDT solution.
 
 > Other unused options here would rely on external databases, such as Redis with PubSub or Postgres with Listen/Notify.
 
-There is a supervised module Api for performing HTTP requests that calls a Cache module.
+There is a supervised module Api for performing dummy HTTP requests that calls a Cache module. The Cache module is a GenServer since we want to keep state.
 You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia. Set the `store: type` with `:mn` or `:ets` or `crdt` or nothing (for the process state).
 
-Ets and Mnesia are both run in their own supervised process.
+EtsDb in just a module that wraps Ets,  and Mnesia is a supervised GenServer since we want to handle network partition.
 
 ## The stores
 
 We have 4 choices to handle state:
 
 - GenServer:
-Basicaly, you could just use a GenServer to cache the HTTP requests as state. We have clients functions and server-side callbacks. State is passed and modifed with corresponding `handle_call` and `handle_cast` to the client functions. Furthermore, we can react to e.g. process calls with `handle_info`. This will be the case in the cluster mode when the Erlang VM will detect a node event.
-A GenServer can be supervised but the data is lost.
+The cache is ket in a GenServer.
 
 - [ETS](https://www.erlang.org/doc/man/ets.html)
 It is an in-build in-memory key-value data store localized in a node and it's life shelf is dependant upon the process that created it: it lives and dies with an individual process.
 The data store is **not distributed**: other nodes within a cluster can't access to it.
 Data is saved with tuples and there is no need to serialize values.
-The default flag `:protected` means that any process can read from the Ets database whilst only the Ets process can write. It then offers shared, concurrent read access to data (meaning scaling upon the number of CPUs used).
+We used the flag `:public` which means that any process can read and write from the Ets database. The operations have to be made atomic to avoid race conditions (for example, no write and then read within the same function as this could lead to inconsistancies). It then offers shared, concurrent read access to data (meaning scaling upon the number of CPUs used).
 
 > Check for the improved [ConCache](https://github.com/sasa1977/con_cache) with TTL support.
 
 - [Mnesia](http://erlang.org/documentation/doc-5.2/pdf/mnesia-4.1.pdf)
-Mnesia is an in-build distributed in-memory and optionnally node-based disc persisted database build for concurrency. It work both in memory (with Ets) and on disc. As Ets, it stores tuples. You can define tables whose structure is defined by a record type.
+Mnesia is an in-build distributed in-memory and optionnally node-based disc persisted database build for concurrency. It work both in memory (**with Ets**) and on disc. As Ets, it stores tuples. You can define tables whose structure is defined by a record type.
 In Mnesia, every action needs to be wrapped within a **transaction**. If something goes wrong with executing a transaction, it will be rolled back and nothing will be saved on the database.
 
   - storage capacity: from the [doc](https://www.erlang.org/faq/mnesia.html), it is indicated that:
@@ -59,22 +57,20 @@ Node.set_cookie :cookie_name
 From an **IEX** session, use the flag `--sname` (for short name) and it will assign **:"a@your-local-system-name"**. If you use instead the flag `--name`, then use **:"a@127.0.0.1"** or **:"a@example.com"**.
 
 ```bash
-> iex --sname a -S mix
-> iex --sname a --cookie cookie_s -S  mix
-```
-
-or
-
-```bash
-# Term 1
-> iex --name a@127.0.0.1  -S mix
+# term 1
+> iex --sname a --cookie :secret -S mix
+iex(a@MacBookND)>
+# or
+> iex --name aa@127.0.0.1  --cookie :secret -S  mix
 [...{:mnesia_up, :"a@127.0.0.1"}...]
-iex(a@127.0.0.1)> :net.ping(:"b@127.0.0.1")
-:pong
 
-# Term 2
+iex(a@127.0.0.1)> :net.ping(:"b@127.0.0.1")
+:pong 
+
+# Ttrm 2
 > iex --name b@127.0.0.1  -S mix
 [...]
+iex(b@127.0.0.1)>
 ```
 
 or with the compiled code:
@@ -85,8 +81,6 @@ or with the compiled code:
 ```
 
 ## Run IEX sessions in new terminals
-
-> a `Process.sleep(100)` is needed for the nodes to connect (in the `handle_info` callback in the Cache GenServer)
 
 On MacOS, `chmod +x` the following:
 
@@ -108,6 +102,21 @@ do
   ttab iex name "$i$host" -S mix
 end
 ```
+
+## RPC or Remote-Procedure-Call between nodes
+
+```bash
+iex(:a@127.0.0.1)> EtsDb.get(1)
+"a"
+iex(:b@127.0.0.1)> EtsDb.get(1)
+"b"
+iex(:a@127.0.0.1)> :rpc.call(:"b@127.0.0.1", EtsDb, :get, [1] )
+"a"
+iex(:a@127.0.0.1)> for node <- Node.list(), do: {node,:rpc.call(node, EtsDb, :get, ["b"])}
+["b@127.0.0.1": "a", "c@127.0.0.1": nil]
+```
+
+
 
 ## Ets
 
@@ -314,6 +323,8 @@ iex> :mnesia.system_info(:directory)
 iex> :mnesia.table_info(:mcache, :attributes)
 [:post_id, :data]
 ```
+
+You can run `:ets.tab2list(:mcache)` in a node and this displays the whole Mnesia table which is in RAM.
 
 To inspect a **GenServer** state, you can use Erlang's `:sys.get_state(genserver_pid)`. We can get the pid with `Process.whereis(Cache)` since we named it.
 

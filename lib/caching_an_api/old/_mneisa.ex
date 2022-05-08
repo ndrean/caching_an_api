@@ -1,122 +1,31 @@
-defmodule MnDb do
+defmodule MnUnSupervised do
   alias :mnesia, as: Mnesia
-  use GenServer
   require Logger
 
-  @moduledoc """
-  This module wraps the Mnesia store and exposes two functions `read` and `write`. Furthermore, it manages the distribution of the Mnesia store within the connected nodes of a cluster.
-  """
-
-  @doc """
-  This function is called by the supervisor and trigger the `MnDb.init` callback
-  """
-  def start_link(opts \\ [store: :mn, mn_table: :mcache]) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
-
-  def read(key, name) do
-    GenServer.call(__MODULE__, {:read, key, name})
-  end
-
-  def write(key, data, name) do
-    GenServer.cast(__MODULE__, {:write, key, data, name})
-  end
-
-  def list(), do: :ets.tab2list(:mcache)
-  #####################################################
-
-  @doc """
-  A flag is added to trigger the GenServer that runs the `terminate` callback when going down.
-  """
-
-  @impl true
-  def init(opts) do
-    Process.flag(:trap_exit, true)
-    name = opts[:mn_table]
-    MnDb.connect_mnesia_to_cluster(name)
-
-    {:ok, name}
-  end
-
-  @impl true
-  def handle_cast({:write, key, data, m_table}, state) do
+  def write(m_table, key, data) do
     case Mnesia.transaction(fn ->
            Mnesia.write({m_table, key, data})
          end) do
-      {:atomic, :ok} -> :ok
+      {:atomic, :ok} -> data
       {:aborted, reason} -> {:aborted, reason}
     end
-
-    {:noreply, state}
   end
 
-  @impl true
-  def handle_call({:read, key, m_table}, _from, state) do
-    reply =
-      case Mnesia.transaction(fn -> Mnesia.read({m_table, key}) end) do
-        {:atomic, []} ->
-          nil
+  def read(m_table, id) do
+    case Mnesia.transaction(fn -> Mnesia.read({m_table, id}) end) do
+      {:atomic, []} ->
+        nil
 
-        {:atomic, [{_m_table, _key, data}]} ->
-          data
+      {:atomic, [{_m_table, _key, data}]} ->
+        data
 
-        {:aborted, cause} ->
-          {:aborted, cause}
-      end
-
-    {:reply, reply, state}
-  end
-
-  @doc """
-  We update the Mnesia cluster based on it's system events to which we subscribe.
-  """
-  @impl true
-  def handle_info({:mnesia_system_event, message}, state) do
-    case message do
-      {:mnesia_down, node} ->
-        Logger.info("\u{2193}  #{node}")
-
-      {:mnesia_up, node} ->
-        Logger.info("\u{2191} #{node}")
-
-      {:inconsistent_database, reason, node} ->
-        Logger.critical("#{reason} at #{node}")
-        # raise "partition"
-        :ok = connect_mnesia_to_cluster(state[:m_table])
+      {:aborted, cause} ->
+        {:aborted, cause}
     end
-
-    {:noreply, state}
   end
 
-  def handle_info({:EXIT, _from, reason}, state) do
-    Logger.warn("exiting Mnesia GS")
-    {:stop, reason, state}
-  end
-
-  @doc """
-  This will be triggered if we run `:init.stop()` for example.
-  """
-  @impl true
-  def terminate(reason, _state) do
-    Logger.critical(" GenServer MnDb terminating: #{inspect(reason)}")
-    System.cmd("say", ["bye to #{node() |> to_string() |> String.at(0)}"])
-    # :ok = remove_old_node_table(node())
-    :ok
-  end
-
-  # Node.disconnect(:"b@127.0.0.1")
-  # Api.stream_synced(1..4)
-  # :ets.tab2list(:mcache)
+  def list(), do: :ets.tab2list(:mcache)
   ########################################
-
-  @doc """
-  Give that `name = :mcache` is the name of the table, we do:
-  1. start Mnesia with `MnDb.ensure_start()`
-  2. connect new node b@node to the `Node.list()` with `MnDb.update_mnesia_nodes()`
-  3. we ensure that the schema table is of type `disc` to allow disc-resisdent tables on the node.
-  4. To create the table and make a disc copy, you use `create_table` and specify the attributes of the table with `disc_copies: [node()]`
-  5. b@node only has a copy of the schema at this point. To copy all the tables from a@node to b@node and maintain table types, you can run `add_table_copy`, or `MnDb.ensure_table_copy_exists_at_node(name)`.
-  """
 
   def connect_mnesia_to_cluster(name) do
     with {:start, :ok} <- {:start, ensure_start()},

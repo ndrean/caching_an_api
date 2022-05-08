@@ -1,4 +1,4 @@
-defmodule Cache.Supervisor do
+defmodule CacheGS.Supervisor do
   use Supervisor
 
   def start_link(init_args) do
@@ -8,7 +8,7 @@ defmodule Cache.Supervisor do
   @impl true
   def init(init_args) do
     [
-      {Cache, init_args}
+      {CacheGS, init_args}
     ]
     |> Supervisor.init(strategy: :one_for_one)
   end

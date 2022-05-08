@@ -2,7 +2,7 @@ defmodule CachingAnApi.Application do
   @moduledoc false
 
   use Application
-
+  require Logger
   # require EtsDb
 
   @impl true
@@ -10,31 +10,30 @@ defmodule CachingAnApi.Application do
     import Supervisor.Spec, warn: false
 
     topologies = Application.get_env(:libcluster, :topologies) || []
-
     opts = [strategy: :one_for_one, name: CachingAnApi.Supervisor]
 
     cache_opt = [
-      store: Application.get_env(:caching_an_api, :store),
-      mn_table: Application.get_env(:caching_an_api, :mn_table),
-      ets_table: Application.get_env(:caching_an_api, :ets_table)
+      store: Application.get_env(:caching_an_api, :store) || :ets,
+      mn_table: Application.get_env(:caching_an_api, :mn_table) || :mcache,
+      ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache
     ]
+
+    # start Ets with a table name
+    EtsDb.init(cache_opt[:ets_table])
+
+    Logger.info("#{inspect(cache_opt)}")
+    # MnUnSupervised.connect_mnesia_to_cluster(cache_opt.mn_table)
 
     # list to be supervised
     [
       # start libcluster
       {Cluster.Supervisor, [topologies, [name: CachingAnApi.ClusterSupervisor]]},
-      # start Ets
 
-      {Ets.Supervisor, [ets_table: cache_opt[:ets_table]]},
+      # start Mnesia GenServer
       {MnDb.Supervisor, [mn_table: cache_opt[:mn_table]]},
 
-      # start the Cache with Mnesia
-      {Cache.Supervisor, cache_opt}
-
-      # %{
-      #   id: EtsDb,
-      #   start: {EtsDb, :start_link, [[cache_opt[:ets_table]]]}
-      # }
+      # start Cache GS
+      {CacheGS.Supervisor, cache_opt}
     ]
     |> Supervisor.start_link(opts)
   end

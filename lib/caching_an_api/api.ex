@@ -1,11 +1,16 @@
 defmodule Api do
-  alias Cache
-  @url "https://jsonplaceholder.typicode.com/todos/"
-
   require Logger
 
+  @url "https://jsonplaceholder.typicode.com/todos/"
+
+  @opts %{
+    store: Application.get_env(:caching_an_api, :store) || :ets,
+    mn_table: Application.get_env(:caching_an_api, :mn_table) || :mcache,
+    ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache
+  }
+
   def fetch(i, f) do
-    data = Cache.get(i)
+    data = Cache.get(i, @opts)
 
     case data do
       nil ->
@@ -22,8 +27,10 @@ defmodule Api do
         {:ok, {i, %{response: data}}}
 
       false ->
-        Cache.put(i, %{data | "was_cached" => true})
-        {:ok, {i, %{response: Cache.get(i)}}}
+        new_data = Map.put(data, "was_cached", true)
+        Cache.put(i, new_data, @opts)
+        # possible race condition if Cache.get(i) after??
+        {:ok, {i, %{response: new_data}}}
     end
   end
 
@@ -72,7 +79,7 @@ defmodule Api do
           |> Poison.decode!()
           |> Map.put("was_cached", false)
 
-        Cache.put(i, body)
+        Cache.put(i, body, @opts)
         {:ok, {i, %{response: body}}}
 
       {:ok, {:error, %HTTPoison.Error{reason: reason}}} ->
@@ -90,7 +97,7 @@ defmodule Api do
           |> Poison.decode!()
           |> Map.put("was_cached", false)
 
-        Cache.put(i, body)
+        Cache.put(i, body, @opts)
         {i, %{response: body}}
 
       {:error, %HTTPoison.Error{reason: reason}} ->
