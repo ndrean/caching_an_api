@@ -2,6 +2,7 @@ defmodule MnDb do
   alias :mnesia, as: Mnesia
   use GenServer
   require Logger
+  require IEx
 
   @moduledoc """
   This module wraps the Mnesia store and exposes two functions `read` and `write`. Furthermore, it manages the distribution of the Mnesia store within the connected nodes of a cluster.
@@ -36,26 +37,33 @@ defmodule MnDb do
   def init(opts) do
     Process.flag(:trap_exit, true)
     name = opts[:mn_table]
-    MnDb.connect_mnesia_to_cluster(name)
+    disc_copy = opts[:disc_copy]
+    MnDb.connect_mnesia_to_cluster(name, disc_copy)
 
     {:ok, name}
   end
 
-  #### TEST functions for rpc
+  #### TEST functions for rpc via GenServer.call
 
-  # GenServer.call({MnDb, :"b@127.0.0.1"}, :node_list)
+  @doc """
+  TEST functions for rpc via GenServer.call
+  It can be executed from a remote node against another one.
 
+  ```elixir
+  GenServer.call({MnDb, :"b@127.0.0.1"}, {:node_list})
+  for node <- Node.list(), do: {node, GenServer.call({MnDb, node}, {:node_list}) }
+
+    ```
+  """
   @impl true
-  def handle_call({:data_list}, from, _state) do
-    reply = :ets.tab2list(:mcache)
-    # Logger.info("#{inspect(reply)}")
-    {:reply, reply, from}
+  def handle_call({:node_list}, _from, state) do
+    reply = Node.list()
+    {:reply, reply, state}
   end
 
   @impl true
-  def handle_call(:node_list, from, state) do
-    reply = Node.list()
-    Logger.info("#{inspect(from)}")
+  def handle_call({:data_list}, _from, state) do
+    reply = :ets.tab2list(:mcache)
     {:reply, reply, state}
   end
 
@@ -115,7 +123,6 @@ defmodule MnDb do
 
   def handle_info({:quit, {:shutdown, :network}}, from) do
     Logger.warn("GS terminating on network error ")
-    # :ok = remove_old_node_table(node())
     {:stop, :shutdown, from}
   end
 
@@ -126,7 +133,7 @@ defmodule MnDb do
   end
 
   @doc """
-  This will be triggered if we run `:init.stop()` for example.
+  This will be triggered if we run `:init.stop()`.
   """
   @impl true
   def terminate(reason, state) do
@@ -150,21 +157,22 @@ defmodule MnDb do
   5. b@node only has a copy of the schema at this point. To copy all the tables from a@node to b@node and maintain table types, you can run `add_table_copy`, or `MnDb.ensure_table_copy_exists_at_node(name)`.
   """
 
-  def connect_mnesia_to_cluster(name) do
+  def connect_mnesia_to_cluster(name, disc_copy? \\ false) do
     Logger.info("Starting...")
+    # IEx.pry()
 
     with {:start, :ok} <- {:start, ensure_start()},
          {:update_nodes, :ok} <- {:update_nodes, update_mnesia_nodes()},
          {:disc_schema, :ok} <-
-           {:disc_schema, ensure_table_from_ram_to_disc_copy(:schema)},
-         {:create_table, :ok} <- {:create_table, ensure_table_create(name)},
+           {:disc_schema, ensure_schema_from_ram_to_disc_copy()},
+         {:create_table, :ok} <- {:create_table, ensure_table_create(name, disc_copy?)},
          {:ensure_table, :ok} <-
-           {:ensure_table, ensure_table_copy_exists_at_node(name)} do
+           {:ensure_table, set_table_type_at_node(name, disc_copy?)} do
       :ok
     else
       {:start, {:error, reason}} -> {:error, :start, reason}
       {:update_nodes, {:error, reason}} -> {:error, :update_nodes, reason}
-      {:disc_schema, {:error, reason}} -> {:error, :disc_schema, reason}
+      # {:disc_schema, {:error, reason}} -> {:error, :disc_schema, reason}
       {:create_table, {:error, reason}} -> {:error, :create_table, reason}
       {:ensure_table, {:error, reason}} -> {:error, :ensure_table, reason}
       {:error, reason} -> {:error, reason}
@@ -203,20 +211,12 @@ defmodule MnDb do
     end
   end
 
-  def remove_old_node_table(node) do
-    {:ok, cwd} = File.cwd()
-    path = cwd <> "/" <> "mndb_" <> to_string(node)
-    {:ok, _} = File.rm_rf(path)
-    Logger.info("RMRF")
-    :ok
-  end
-
   @doc """
-  We ensure that the `:schema` table is of type `disc_copy` since otherwise, a `ram_copies`type schema doesn't any other disc-resident table.
+  We ensure that the `:schema` table is of type `disc_copies` since a `ram_copies`type schema doesn't allow other disc-resident tables.
   """
-  def ensure_table_from_ram_to_disc_copy(name) do
-    with :ok <- wait_for(name) do
-      case Mnesia.change_table_copy_type(name, node(), :disc_copies) do
+  def ensure_schema_from_ram_to_disc_copy() do
+    with :ok <- wait_for(:schema) do
+      case Mnesia.change_table_copy_type(:schema, node(), :disc_copies) do
         {:atomic, :ok} ->
           :ok
 
@@ -224,21 +224,35 @@ defmodule MnDb do
           :ok
 
         {:aborted, reason} ->
-          Logger.debug("ETR2D: #{inspect(reason)}")
+          Logger.debug("schema: #{inspect(reason)}")
           {:error, reason}
       end
+
+      # else
+      #   _ -> :ok
     end
   end
 
-  def ensure_table_create(name) do
+  def ensure_table_create(name, disc_copy) do
     table =
-      Mnesia.create_table(
-        name,
-        access_mode: :read_write,
-        attributes: [:post_id, :data],
-        disc_copies: [node()],
-        type: :ordered_set
-      )
+      case disc_copy do
+        :disc_copy ->
+          Mnesia.create_table(
+            name,
+            access_mode: :read_write,
+            attributes: [:post_id, :data],
+            disc_copies: [node()],
+            type: :ordered_set
+          )
+
+        _ ->
+          Mnesia.create_table(
+            name,
+            access_mode: :read_write,
+            attributes: [:post_id, :data],
+            type: :ordered_set
+          )
+      end
 
     case table do
       {:atomic, :ok} ->
@@ -249,7 +263,7 @@ defmodule MnDb do
         :ok
 
       {:aborted, reason} ->
-        Logger.debug("ETC: #{inspect(reason)}")
+        Logger.debug("Ensure Table: #{inspect(reason)}")
         {:error, reason}
     end
   end
@@ -257,30 +271,32 @@ defmodule MnDb do
   @doc """
   This one is needed to disc-copy the "remote" data table to the new node.
   """
-  def ensure_table_copy_exists_at_node(name) do
+  def set_table_type_at_node(name, type_copy) do
+    type = if type_copy != :disc_copy, do: :ram_copies, else: :disc_copies
+
     with :ok <- wait_for(name) do
-      case Mnesia.add_table_copy(name, node(), :disc_copies) do
+      case Mnesia.add_table_copy(name, node(), type) do
         {:atomic, :ok} ->
           :ok
 
         {:aborted, {:already_exists, _name, _node}} ->
           :ok
 
-        {:error, {:already_exists, _table, _node, :disc_copies}} ->
+        {:error, {:already_exists, _table, _node, _}} ->
           :ok
 
         {:aborted, reason} ->
-          Logger.debug("ETCEAT: #{inspect(reason)}")
+          Logger.debug("set type at node: #{inspect(reason)}")
           {:error, reason}
       end
     else
       {:error, :ensure_table} ->
-        ensure_table_copy_exists_at_node(name)
+        set_table_type_at_node(name, type_copy)
     end
   end
 
   def wait_for(name) do
-    case Mnesia.wait_for_tables([name], 500) do
+    case Mnesia.wait_for_tables([name], 1000) do
       :ok ->
         :ok
 
@@ -289,8 +305,16 @@ defmodule MnDb do
 
       {:timeout, _name} ->
         Logger.debug("loop wait #{name}")
-        Process.sleep(200)
+        Process.sleep(500)
         wait_for(name)
     end
   end
+
+  # defp remove_old_node_table(node) do
+  #   {:ok, cwd} = File.cwd()
+  #   path = cwd <> "/" <> "mndb_" <> to_string(node)
+  #   {:ok, _} = File.rm_rf(path)
+  #   Logger.info("RMRF")
+  #   :ok
+  # end
 end

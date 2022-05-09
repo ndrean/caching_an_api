@@ -15,8 +15,11 @@ defmodule CachingAnApi.Application do
     cache_opt = [
       store: Application.get_env(:caching_an_api, :store) || :ets,
       mn_table: Application.get_env(:caching_an_api, :mn_table) || :mcache,
-      ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache
+      ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache,
+      disc_copy: Application.get_env(:caching_an_api, :disc_copy) || nil
     ]
+
+    mn_opt = [mn_table: cache_opt[:mn_table], disc_copy: cache_opt[:disc_copy]]
 
     cluster_type =
       Application.get_env(:libcluster, :topologies)[:local_epmd][:strategy] ||
@@ -35,7 +38,7 @@ defmodule CachingAnApi.Application do
       {Cluster.Supervisor, [topologies, [name: CachingAnApi.ClusterSupervisor]]},
 
       # start Mnesia GenServer
-      {MnDb.Supervisor, [mn_table: cache_opt[:mn_table]]},
+      {MnDb.Supervisor, mn_opt},
 
       # start Cache GS
       {CacheGS.Supervisor, cache_opt}

@@ -13,8 +13,5 @@ defmodule MnDb.Supervisor do
       {MnDb, init_args}
     ]
     |> Supervisor.init(strategy: :one_for_one)
-
-    # Mnesiac.init_mnesia(config)
-    # Supervisor.init([], opts)
   end
 end

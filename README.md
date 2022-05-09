@@ -5,7 +5,7 @@ To illustrate the usage of different in-build stores, we cache responses to HTTP
 > Other unused options here would rely on external databases, such as Redis with PubSub or Postgres with Listen/Notify.
 
 There is a module Api for performing dummy HTTP requests. It calls a Cache module. The Cache module is a GenServer since we want to keep state (for the illustration, otherwise no GenServer and directly use Ets).
-You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia or CRDT. Set the `store: type` with `:mn` or `:ets` or `crdt` or nothing (for the process state).
+You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia w/o disc persistance or CRDT. Set the `store: type` with `:mn` or `:ets` or `crdt` or `store: nil` (for the process state). Also set `disc_copy` to `:disc_copy` or `nil` if your want persistance on each node or not.
 
 EtsDb in just a module that wraps Ets, and Mnesia is a supervised GenServer since we want to handle network partition.
 
@@ -22,7 +22,7 @@ Since we launch Ets in it's own process, we used the flag `:public`. Any process
 - [Mnesia](http://erlang.org/documentation/doc-5.2/pdf/mnesia-4.1.pdf)
 Mnesia is an in-build distributed in-memory and optionnally  disc persisted database build (node-based) for concurrency. It works both in memory (**with Ets**) and on disc. As Ets, it stores tuples.
 You can define tables whose structure is defined by a record type.
-In Mnesia, actions are wrapped within a **transaction**: if something goes wrong with executing a transaction, it will be rolled back and nothing will be saved on the database.
+In Mnesia, actions are wrapped within a **transaction**: if something goes wrong with executing a transaction, it will be rolled back and nothing will be saved on the database. The disc persistance is optional in Mnesia. Set `disc_copy: :disc_copy` or to `nil` in the "config.exs".
 
   - storage capacity: from the [doc](https://www.erlang.org/faq/mnesia.html), it is indicated that:
     - for ram_copies and disc_copies, the entire table is kept in memory, so data size is limited by available RAM.
@@ -36,14 +36,14 @@ In Mnesia, actions are wrapped within a **transaction**: if something goes wrong
 - [CRDT](https://github.com/derekkraan/delta_crdt_ex)
 DeltaCrdt implements a key/value store using concepts from Delta CRDTs. A CRDT can be used as a distributed temporary caching mechanism that is synced across our Cluster. A good introduction to [CRDT](https://moosecode.nl/blog/how_deltacrdt_can_help_write_distributed_elixir_applications).
 
-## Connecting machines
+## The Erlang cluster
 
 In an Erlang cluster, all nodes are fully connected, with N(N-1)/2 <=> O(N^2) TCP/IP connections.
 A [word](http://dcs.gla.ac.uk/~natalia/sd-erlang-improving-jpdc-16.pdf) on full P2P Erlang clusters. The performance plateau at 40 nodes and do not scale beyond 60 nodes.
 
-To create a cluster, from an **IEX** session, you need to pass a name to connect the nodes.
+To create a cluster, from an **IEX** session, you need to pass a name to connect the nodes and pass the same cookie to each node.
 
-### Launch instancies
+### Launch the nodes
 
 - [name] Use the flag `--sname` (for short name, within the *same* network) and it will assign **:"a@your-local-system-name"**. If you are not running in the same network, use instead the flag `--name` with a qualified domain, such as **:"a@127.0.0.1"** or **:"a@example.com"**.
 
@@ -56,7 +56,7 @@ iex(a@MacBookND)>
 iex(A@127.0.0.1)>
 ```
 
-So to launch 3 nodes, run in 3 separate terminal
+So to launch 3 nodes, run in 3 separate terminals:
 
 ```elixir
 #t1
@@ -67,7 +67,7 @@ So to launch 3 nodes, run in 3 separate terminal
 > iex --name A@127.0.0.1  --cookie :my_secret -S  mix
 ```
 
-### Automatic launches of IEX sessions in new terminals
+#### Automatic launch of IEX sessions in new terminals
 
 On MacOS, `chmod +x` the following:
 
@@ -90,35 +90,36 @@ do
 end
 ```
 
-### Connect
+### Connect the nodes
 
-- [connect] Thanks to the **transitivty** of the BEAM connections,  you just need to connect one node to the N-1 others to get the full P2P network of N(N-1)/2 connections.
+- [connect] Thanks to the **transitivty** of the BEAM connections,  you just need to connect one node to the N-1 others to get the full P2P network of N(N-1)/2 TPC connections.
 
 #### Manual connection
 
 Within one terminal, say t1, run:
 
 ```elixir
-iex(A@127.0.0.1)> for l <- ["A","B","C"], do: String.to_atom(l<> "@MacBookND") |> Node.connect()
+iex(A@127.0.0.1)> for l <- ["A","B","C"], do: String.to_atom(l<> "@127.0.0.1") |> Node.connect()
 [true,true,true,true ]
 
+# check with:
 iex(A@127.0.0.1)> :net.ping(:"C@127.0.0.1")
 :pong 
 iex(B@127.0.0.1)> :net.ping(:"D@127.0.0.1")
 :pong 
 ```
 
-With **code**, if you want to connect two machines "a@node" and "b@node" with respective IP of 192.168.0.1 and 192.168.0.2, then within code you would do:
+With **code**, if you want to connect two machines "a@node" and "b@node" with respective IP of 192.168.0.1 and 192.168.0.2, then you would do:
 
 ```elixir
 # on the "a@node@ machine
 Node.start :"a@192.168.0.1"
-Node.set_cookie :cookie_name
+Node.set_cookie :my_secret
 Node.connect "b@192.168.0.2"
 
 # on the "b@node" machine
 Node.start :"b@192.168.0.2"
-Node.set_cookie :cookie_name
+Node.set_cookie :my_secret
 
 # from A@node:
 Node.connect(:"b@192.168.0.1")
@@ -173,17 +174,17 @@ then you see:
 ```elixir
 iex(:a@127.0.0.1)> :rpc.call(:"b@127.0.0.1", EtsDb, :get, [1] )
 "a"
-iex(:a@127.0.0.1)> for node <- Node.list(), do: {node,:rpc.call(node, EtsDb, :get, ["b"])}
-["b@127.0.0.1": "a", "c@127.0.0.1": "b"]
+iex(:c@127.0.0.1)> for node <- Node.list(), do: {node, :rpc.call(node, EtsDb, :get, [1])}
+["a@127.0.0.1": "a", "b@127.0.0.1": "b"]
 ```
 
-If `Module.node_list` is implemented with a callback `:node_list` within a GenServer, you can use `GenServer.call`:
+Suppose we have a client function `Module.node_list` implemented with a callback `:node_list` within a GenServer, then you can use `GenServer.call` to run a remote function on another node (be careful with the construction of the functions with the brackets "}").
 
 ```elixir
-iex(c@127.0.0.1)> GenServer.call({MnDb, :"b@127.0.0.1"}, :node_list)
+iex(c@127.0.0.1)> GenServer.call({MnDb, :"b@127.0.0.1"}, {:node_list})
 [:"a@127.0.0.1", :"c@127.0.0.1"]
 
-iex(c@127.0.0.1)> for node <- Node.list(), do: {node, GenServer.call({MnDb, node}, :node_list) }
+iex(c@127.0.0.1)> for node <- Node.list(), do: {node, GenServer.call({MnDb, node}, {:node_list}) }
 [
   "a@127.0.0.1": [:"b@127.0.0.1", :"c@127.0.0.1"],
   "b@127.0.0.1": [:"a@127.0.0.1", :"c@127.0.0.1"]
@@ -420,7 +421,11 @@ An important difference between passing messages and calling methods is that mes
 
 [handle_continue](https://elixirschool.com/blog/til-genserver-handle-continue/)
 
+[GernServer stop](https://alexcastano.com/how-to-stop-a-genserver-in-elixir/)
+
 ### Production release
+
+Take a look at [Render](https://render.com/docs/deploy-elixir-cluster) and [Gigalixir](https://gigalixir.com/#/about) and [fly.io](https://fly.io/docs/getting-started/elixir/)
 
 ```bash
 mix phx.gen.secret
