@@ -1,6 +1,6 @@
 defmodule CacheGS do
   use GenServer
-  require EtsDb
+  # require EtsDb
   # require MnDb
   require Logger
 
@@ -25,6 +25,10 @@ defmodule CacheGS do
     GenServer.cast(__MODULE__, {:put, key, data})
   end
 
+  def inverse(index, key) do
+    GenServer.call(__MODULE__, {:inverse, index, key})
+  end
+
   ###########################################
   ## callbacks
 
@@ -42,6 +46,13 @@ defmodule CacheGS do
     :ok = :net_kernel.monitor_nodes(true)
 
     {:ok, opts}
+  end
+
+  @impl true
+  def handle_call({:inverse, index, key}, _from, state) do
+    reply = if state[:store] == :mn, do: MnDb.inverse(index, key, state[:mn_table])
+
+    {:reply, reply, state}
   end
 
   @impl true
@@ -91,11 +102,13 @@ defmodule CacheGS do
   """
   @impl true
   def handle_info({:nodeup, _node}, state) do
+    # MnDb2.update_mnesia_nodes()
     {:noreply, state}
   end
 
   @impl true
   def handle_info({:nodedown, _node}, state) do
+    # MnDb2.update_mnesia_nodes()
     {:noreply, state}
   end
 end

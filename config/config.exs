@@ -6,7 +6,8 @@ config :mnesia,
 config :logger, :console, format: "[$date $time] $message\n", colors: [enabled: true]
 
 config :caching_an_api,
-  store: :mn,
+  cookie: :my_secret,
+  store: :ets,
   mn_table: :mcache,
   ets_table: :ecache,
   disc_copy: nil

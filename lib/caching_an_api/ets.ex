@@ -1,10 +1,10 @@
 defmodule EtsDb do
   require Logger
 
-  def init(name) do
+  def init(opts) do
     name =
       :ets.new(
-        name,
+        opts[:ets_table],
         [:ordered_set, :public, :named_table, read_concurrency: true]
       )
 
@@ -12,7 +12,7 @@ defmodule EtsDb do
     :ok
   end
 
-  def get(key, name \\ :ecache) do
+  def get(key, name) do
     case :ets.lookup(name, key) do
       [] -> nil
       [{^key, data}] -> data
@@ -20,7 +20,7 @@ defmodule EtsDb do
     end
   end
 
-  def put(key, data, name \\ :ecache) do
+  def put(key, data, name) do
     :ets.insert(name, {key, data})
     :ok
   end

@@ -1,15 +1,20 @@
-defmodule MnDb do
+defmodule MnDb2 do
   alias :mnesia, as: Mnesia
-  use GenServer
   require Logger
-  require IEx
 
   @moduledoc """
   This module wraps the Mnesia store and exposes two functions `read` and `write`. Furthermore, it manages the distribution of the Mnesia store within the connected nodes of a cluster.
   """
 
-  def read(key, name) do
-    case Mnesia.transaction(fn -> Mnesia.read({name, key}) end) do
+  _opt = [
+    store: Application.get_env(:caching_an_api, :store) || :ets,
+    mn_table: Application.get_env(:caching_an_api, :mn_table) || :mcache,
+    ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache,
+    disc_copy: Application.get_env(:caching_an_api, :disc_copy) || nil
+  ]
+
+  def read(key, m_table \\ :mcache) do
+    case Mnesia.transaction(fn -> Mnesia.read({m_table, key}) end) do
       {:atomic, []} ->
         nil
 
@@ -21,182 +26,30 @@ defmodule MnDb do
     end
   end
 
-  def write(key, data, name) do
-    case Mnesia.transaction(fn -> Mnesia.write({name, key, data}) end) do
+  # %{"completed" => true,"id" => 1,"title" => "delectus aut autem","userId" => 1,"was_cached" => true}, :mcache)
+
+  def write(key, data, m_table \\ :mcache) do
+    case Mnesia.transaction(fn ->
+           Mnesia.write({m_table, key, data})
+         end) do
       {:atomic, :ok} -> :ok
       {:aborted, reason} -> {:aborted, reason}
     end
   end
 
-  def inverse(index, key, name) do
+  def update(index, key, m_table \\ :mcache) do
     case Mnesia.transaction(fn ->
-           [{^name, ^index, data}] = Mnesia.read({name, index})
-           Mnesia.write({name, index, Map.put(data, key, true)})
+           [{^m_table, ^index, data}] = Mnesia.read({m_table, index})
+           Mnesia.write({m_table, index, Map.put(data, key, true)})
          end) do
-      {:atomic, :ok} ->
-        MnDb2.read(index, name)
-
-      {:aborted, reason} ->
-        {:aborted, reason}
+      {:atomic, :ok} -> :ok
+      {:aborted, reason} -> {:aborted, reason}
     end
   end
 
-  ### Test functions
-  def nodes(), do: GenServer.call(__MODULE__, {:nodes})
-  def data(), do: GenServer.call(__MODULE__, {:data})
+  def nodes(), do: Node.list()
+  def data(), do: :ets.tab2list(:mcache)
   def info(), do: :mnesia.system_info()
-
-  ### GenServer init client
-
-  @doc """
-  This function is called by the supervisor and trigger the `MnDb.init` callback
-  """
-  def start_link(opts \\ [store: :mn, mn_table: :mcache]) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
-
-  ###
-
-  @doc """
-  A flag is added to trigger the GenServer that runs the `terminate` callback when going down.
-  """
-
-  @impl true
-  def init(opts) do
-    Process.flag(:trap_exit, true)
-
-    m_name = opts[:mn_table]
-    disc_copy = opts[:disc_copy]
-
-    if opts[:store] == :mn, do: MnDb.connect_mnesia_to_cluster(m_name, disc_copy)
-
-    state = Enum.into(opts, %{})
-    # if opts[:store] == :mn, do: m_name, else: opts[:ets_table]
-    {:ok, state}
-  end
-
-  #### TEST functions for rpc via GenServer.call
-
-  @doc """
-  TEST functions for rpc via GenServer.call
-  It can be executed from a remote node against another one.
-
-  ```elixir
-  GenServer.call({MnDb, :"b@127.0.0.1"}, {:node_list})
-  for node <- Node.list(), do: {node, GenServer.call({MnDb, node}, {:node_list}) }
-
-    ```
-  """
-  @impl true
-  def handle_call({:nodes}, _from, state) do
-    reply = Node.list()
-    {:reply, reply, state}
-  end
-
-  @impl true
-  def handle_call({:data}, _from, state) do
-    reply =
-      if state[:store] == :ets,
-        do: :ets.tab2list(state[:ets_table]),
-        else: :ets.tab2list(state[:mn_table])
-
-    {:reply, reply, state}
-  end
-
-  #### END TEST functions
-
-  # @impl true
-  # def handle_call({:read, key, m_table}, _from, state) do
-  #   reply =
-  #     case Mnesia.transaction(fn -> Mnesia.read({m_table, key}) end) do
-  #       {:atomic, []} ->
-  #         nil
-
-  #       {:atomic, [{_m_table, _key, data}]} ->
-  #         data
-
-  #       {:aborted, cause} ->
-  #         {:aborted, cause}
-  #     end
-
-  #   {:reply, reply, state}
-  # end
-
-  # @impl true
-  # def handle_cast({:write, key, data, m_table}, state) do
-  #   case Mnesia.transaction(fn ->
-  #          Mnesia.write({m_table, key, data})
-  #        end) do
-  #     {:atomic, :ok} -> :ok
-  #     {:aborted, reason} -> {:aborted, reason}
-  #   end
-
-  #   {:noreply, state}
-  # end
-
-  # @impl true
-  # def handle_call({:update, index, key, m_table}, _from, state) do
-  #   reply =
-  #     with :mn <- state.store do
-  #       case Mnesia.transaction(fn ->
-  #              [{^m_table, ^index, data}] = Mnesia.read({m_table, index})
-  #              Mnesia.write({m_table, index, Map.put(data, key, true)})
-  #            end) do
-  #         {:atomic, :ok} ->
-  #           {:ok, %{response: MnDb2.read(index, m_table)}}
-
-  #         {:aborted, reason} ->
-  #           {:aborted, reason}
-  #       end
-  #     end
-
-  #   {:reply, reply, state}
-  # end
-
-  @doc """
-  We update the Mnesia cluster based on it's system events to which we subscribe.
-  """
-  @impl true
-  def handle_info({:mnesia_system_event, message}, state) do
-    case message do
-      {:mnesia_down, node} ->
-        Logger.info("\u{2193}  #{node}", ansi_color: :magenta)
-
-      {:mnesia_up, node} ->
-        Logger.info("\u{2191} #{node}", ansi_color: :green)
-
-      {:inconsistent_database, reason, node} ->
-        Logger.critical("#{reason} at #{node}")
-        # raise "partition"
-        Mnesia.stop()
-        send(__MODULE__, {:quit, {:shutdown, :network}})
-        # {:stop, {:shutdown, :network}, state}
-    end
-
-    {:noreply, state}
-  end
-
-  def handle_info({:quit, {:shutdown, :network}}, from) do
-    Logger.warn("GS terminating on network error ")
-    {:stop, :shutdown, from}
-  end
-
-  def handle_info({:EXIT, _from, reason}, state) do
-    Logger.warn("GenServer MnDb terminating at #{inspect(node())}")
-    Mnesia.stop()
-    {:stop, reason, state}
-  end
-
-  @doc """
-  This will be triggered if we run `:init.stop()`.
-  """
-  @impl true
-  def terminate(reason, state) do
-    Logger.warn(" GenServer MnDb terminating: #{inspect(reason)}")
-    System.cmd("say", ["bye to #{node() |> to_string() |> String.at(0)}"])
-
-    {:ok, state}
-  end
 
   # Node.disconnect(:"b@127.0.0.1")
   # Api.stream_synced(1..4)
@@ -364,12 +217,4 @@ defmodule MnDb do
         wait_for(name)
     end
   end
-
-  # defp remove_old_node_table(node) do
-  #   {:ok, cwd} = File.cwd()
-  #   path = cwd <> "/" <> "mndb_" <> to_string(node)
-  #   {:ok, _} = File.rm_rf(path)
-  #   Logger.info("RMRF")
-  #   :ok
-  # end
 end

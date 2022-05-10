@@ -5,9 +5,12 @@ To illustrate the usage of different in-build stores, we cache responses to HTTP
 > Other unused options here would rely on external databases, such as Redis with PubSub or Postgres with Listen/Notify.
 
 There is a module Api for performing dummy HTTP requests. It calls a Cache module. The Cache module is a GenServer since we want to keep state (for the illustration, otherwise no GenServer and directly use Ets).
+A word about [performance between GenServer and Ets](<https://prying.io/technical/2019/09/01/caching-options-in-an-elixir-application.html>).
+
 You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia w/o disc persistance or CRDT. Set the `store: type` with `:mn` or `:ets` or `crdt` or `store: nil` (for the process state). Also set `disc_copy` to `:disc_copy` or `nil` if your want persistance on each node or not.
 
 EtsDb in just a module that wraps Ets, and Mnesia is a supervised GenServer since we want to handle network partition.
+[TODO]: Mnesia without a GenServer??
 
 ## The stores
 
@@ -178,13 +181,13 @@ iex(:c@127.0.0.1)> for node <- Node.list(), do: {node, :rpc.call(node, EtsDb, :g
 ["a@127.0.0.1": "a", "b@127.0.0.1": "b"]
 ```
 
-Suppose we have a client function `Module.node_list` implemented with a callback `:node_list` within a GenServer, then you can use `GenServer.call` to run a remote function on another node (be careful with the construction of the functions with the brackets "}").
+Suppose we have a client function `Module.nodes` implemented with a callback `:nodes` within a GenServer, then you can use `GenServer.call` to run a remote function on another node (be careful with the construction of the functions with the brackets "}").
 
 ```elixir
 iex(c@127.0.0.1)> GenServer.call({MnDb, :"b@127.0.0.1"}, {:node_list})
 [:"a@127.0.0.1", :"c@127.0.0.1"]
 
-iex(c@127.0.0.1)> for node <- Node.list(), do: {node, GenServer.call({MnDb, node}, {:node_list}) }
+iex(c@127.0.0.1)> for node <- Node.list(), do: {node, GenServer.call({MnDb, node}, {:nodes}) }
 [
   "a@127.0.0.1": [:"b@127.0.0.1", :"c@127.0.0.1"],
   "b@127.0.0.1": [:"a@127.0.0.1", :"c@127.0.0.1"]
