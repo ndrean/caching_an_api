@@ -30,7 +30,7 @@ defmodule CachingAnApi.Application do
 
     # start Ets with a table name
     EtsDb.init(cache_opt)
-    # MnDb2.connect_mnesia_to_cluster(cache_opt[:mn_table])
+    # MnDb2.connect_mnesia_to_cluster(cache_opt)
 
     # list to be supervised
     [
@@ -38,7 +38,7 @@ defmodule CachingAnApi.Application do
       {Cluster.Supervisor, [topologies, [name: CachingAnApi.ClusterSupervisor]]},
 
       # start Mnesia GenServer
-      {MnDb.Supervisor, cache_opt},
+      # {MnDb.Supervisor, cache_opt},
 
       # start Cache GS
       {CacheGS.Supervisor, cache_opt}

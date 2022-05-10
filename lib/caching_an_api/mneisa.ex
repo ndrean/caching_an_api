@@ -65,8 +65,10 @@ defmodule MnDb2 do
   5. b@node only has a copy of the schema at this point. To copy all the tables from a@node to b@node and maintain table types, you can run `add_table_copy`, or `MnDb.ensure_table_copy_exists_at_node(name)`.
   """
 
-  def connect_mnesia_to_cluster(name, disc_copy? \\ false) do
+  def connect_mnesia_to_cluster(opt) do
     Logger.info("Starting...")
+    disc_copy? = opt[:disc_copy]
+    name = opt[:mn_table]
     # IEx.pry()
 
     with {:start, :ok} <- {:start, ensure_start()},

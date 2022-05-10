@@ -102,13 +102,19 @@ defmodule CacheGS do
   """
   @impl true
   def handle_info({:nodeup, _node}, state) do
-    # MnDb2.update_mnesia_nodes()
+    MnDb2.connect_mnesia_to_cluster(state)
     {:noreply, state}
   end
 
   @impl true
   def handle_info({:nodedown, _node}, state) do
-    # MnDb2.update_mnesia_nodes()
+    MnDb2.update_mnesia_nodes()
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:mnesia_system_event, info}, state) do
+    Logger.info("#{inspect(info)}")
     {:noreply, state}
   end
 end

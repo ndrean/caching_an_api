@@ -14,9 +14,9 @@ defmodule CachingAnApi.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
-      mod: {CachingAnApi.Application, []},
-      included_applications: [:mnesia]
+      extra_applications: [:logger, :mnesia],
+      mod: {CachingAnApi.Application, []}
+      # included_applications: [:mnesia]
     ]
   end
 
