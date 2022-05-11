@@ -6,13 +6,6 @@ defmodule MnDb2 do
   This module wraps the Mnesia store and exposes two functions `read` and `write`. Furthermore, it manages the distribution of the Mnesia store within the connected nodes of a cluster.
   """
 
-  _opt = [
-    store: Application.get_env(:caching_an_api, :store) || :ets,
-    mn_table: Application.get_env(:caching_an_api, :mn_table) || :mcache,
-    ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache,
-    disc_copy: Application.get_env(:caching_an_api, :disc_copy) || nil
-  ]
-
   def read(key, m_table \\ :mcache) do
     case Mnesia.transaction(fn -> Mnesia.read({m_table, key}) end) do
       {:atomic, []} -> nil
