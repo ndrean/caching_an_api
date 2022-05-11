@@ -160,13 +160,15 @@ defmodule MnDb do
   def handle_info({:mnesia_system_event, message}, state) do
     case message do
       {:mnesia_down, node} ->
+        update_mnesia_nodes()
         Logger.info("\u{2193}  #{node}", ansi_color: :magenta)
 
       {:mnesia_up, node} ->
+        # update_mnesia_nodes()
         Logger.info("\u{2191} #{node}", ansi_color: :green)
 
       {:inconsistent_database, reason, node} ->
-        Logger.critical("#{reason} at #{node}")
+        Logger.warn("#{reason} at #{node}")
         # raise "partition"
         Mnesia.stop()
         send(__MODULE__, {:quit, {:shutdown, :network}})
@@ -183,7 +185,6 @@ defmodule MnDb do
 
   def handle_info({:EXIT, _from, reason}, state) do
     Logger.warn("GenServer MnDb terminating at #{inspect(node())}")
-    Mnesia.stop()
     {:stop, reason, state}
   end
 
