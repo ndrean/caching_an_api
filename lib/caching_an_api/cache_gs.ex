@@ -45,12 +45,21 @@ defmodule CacheGS do
     # subscribe to node changes
     :ok = :net_kernel.monitor_nodes(true)
 
-    {:ok, opts}
+    state = opts
+
+    case opts[:store] do
+      nil ->
+        state = Enum.into(opts, %{}) |> Map.put(:req, %{})
+        {:ok, state}
+
+      _ ->
+        {:ok, state}
+    end
   end
 
   @impl true
   def handle_call({:inverse, index, key}, _from, state) do
-    reply = if state[:store] == :mn, do: MnDb.inverse(index, key, state[:mn_table])
+    reply = if state[:store] == :mn, do: MnDb2.inverse(index, key, state[:mn_table])
 
     {:reply, reply, state}
   end
@@ -60,7 +69,7 @@ defmodule CacheGS do
     cache =
       case state[:store] do
         :mn ->
-          MnDb.read(key, state[:mn_table])
+          MnDb2.read(key, state[:mn_table])
 
         :ets ->
           EtsDb.get(key, state[:ets_table])
@@ -69,7 +78,7 @@ defmodule CacheGS do
           nil
 
         nil ->
-          state[key]
+          state.req[key]
       end
 
     {:reply, cache, state}
@@ -77,24 +86,24 @@ defmodule CacheGS do
 
   @impl true
   def handle_cast({:put, key, data}, state) do
-    new_state =
+    state =
       case state[:store] do
         :ets ->
           EtsDb.put(key, data, state[:ets_table])
           state
 
         :mn ->
-          MnDb.write(key, data, state[:mn_table])
+          MnDb2.write(key, data, state[:mn_table])
           state
 
         :dcrt ->
           nil
 
         nil ->
-          Map.put(state, key, data)
+          %{state | req: Map.put(state.req, key, data)}
       end
 
-    {:noreply, new_state}
+    {:noreply, state}
   end
 
   @doc """

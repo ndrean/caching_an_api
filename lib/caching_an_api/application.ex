@@ -16,7 +16,7 @@ defmodule CachingAnApi.Application do
     Node.set_cookie(cookie)
 
     cache_opt = [
-      store: Application.get_env(:caching_an_api, :store) || :ets,
+      store: Application.get_env(:caching_an_api, :store),
       mn_table: Application.get_env(:caching_an_api, :mn_table) || :mcache,
       ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache,
       disc_copy: Application.get_env(:caching_an_api, :disc_copy) || nil
@@ -30,7 +30,6 @@ defmodule CachingAnApi.Application do
 
     # start Ets with a table name
     EtsDb.init(cache_opt)
-    # MnDb2.connect_mnesia_to_cluster(cache_opt)
 
     # list to be supervised
     [

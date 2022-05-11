@@ -1,16 +1,20 @@
 # CachingAnApi
 
-To illustrate the usage of different in-build stores, we cache responses to HTTP calls with different solutions: a GenServer, an Ets data store and a Mnesia database in the case of a distributed cluster and a CRDT solution.
+To illustrate the usage of different in-build stores, we cache responses to HTTP calls with different solutions: (a GenServer), an Ets data store and a Mnesia database in the case of a distributed cluster and a CRDT solution.
 
 > Other unused options here would rely on external databases, such as Redis with PubSub or Postgres with Listen/Notify.
 
-There is a module Api for performing dummy HTTP requests. It calls a Cache module. The Cache module is a GenServer since we want to keep state (for the illustration, otherwise no GenServer and directly use Ets).
-A word about [performance between GenServer and Ets](<https://prying.io/technical/2019/09/01/caching-options-in-an-elixir-application.html>).
+There is a module Api for performing dummy HTTP requests. It calls a Cache module. The Cache module is a GenServer: it distributes the read/Write to te request data store, and monitors the nodes up/down to trigger Mnesia startup and Mnesia cluster update.
+
+Two branches:
+
+- [master]: Mnesia is wrapped into a GenServer. We use Mnesia system events upt udpate the Mnesia cluster and start MNesia at node.
+
+- [mnesia-no-gs]: Mnesia is directly accessible. We use Erlang node monitoring to start  and update the MNesia cluster.
 
 You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia w/o disc persistance or CRDT. Set the `store: type` with `:mn` or `:ets` or `crdt` or `store: nil` (for the process state). Also set `disc_copy` to `:disc_copy` or `nil` if your want persistance on each node or not.
 
-EtsDb in just a module that wraps Ets, and Mnesia is a supervised GenServer since we want to handle network partition.
-[TODO]: Mnesia without a GenServer??
+EtsDb in just a module that wraps Ets, and Mnesia is or not a supervised GenServer since we want to handle network partition.
 
 ## The stores
 
@@ -19,6 +23,7 @@ It is an in-build in-memory key-value data store localized in a node and it's li
 This data store is **not distributed**: other nodes within a cluster can't access to it.
 Data is saved with tuples and there is no need to serialize values.
 Since we launch Ets in it's own process, we used the flag `:public`. Any process can thus read and write from the Ets database. The operations have to be made atomic to avoid race conditions (for example, no write and then read within the same function as this could lead to inconsistancies). It then offers shared, concurrent read access to data (meaning scaling upon the number of CPUs used).
+A word about [performance between GenServer and Ets](<https://prying.io/technical/2019/09/01/caching-options-in-an-elixir-application.html>).
 
 > Check for the improved [ConCache](https://github.com/sasa1977/con_cache) with TTL support.
 
@@ -177,8 +182,13 @@ then you see:
 ```elixir
 iex(:a@127.0.0.1)> :rpc.call(:"b@127.0.0.1", EtsDb, :get, [1] )
 "a"
+
 iex(:c@127.0.0.1)> for node <- Node.list(), do: {node, :rpc.call(node, EtsDb, :get, [1])}
 ["a@127.0.0.1": "a", "b@127.0.0.1": "b"]
+
+# or use `multicall`-> {sucess, failure}
+iex(:c@127.0.0.1)> :rpc.multicall(EtsDb, :get, [1])
+{["a@127.0.0.1": "a", "b@127.0.0.1": "b"], []}
 ```
 
 Suppose we have a client function `Module.nodes` implemented with a callback `:nodes` within a GenServer, then you can use `GenServer.call` to run a remote function on another node (be careful with the construction of the functions with the brackets "}").

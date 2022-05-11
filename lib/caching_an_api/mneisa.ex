@@ -15,14 +15,9 @@ defmodule MnDb2 do
 
   def read(key, m_table \\ :mcache) do
     case Mnesia.transaction(fn -> Mnesia.read({m_table, key}) end) do
-      {:atomic, []} ->
-        nil
-
-      {:atomic, [{_m_table, _key, data}]} ->
-        data
-
-      {:aborted, cause} ->
-        {:aborted, cause}
+      {:atomic, []} -> nil
+      {:atomic, [{_m_table, _key, data}]} -> data
+      {:aborted, cause} -> {:aborted, cause}
     end
   end
 
@@ -37,18 +32,18 @@ defmodule MnDb2 do
     end
   end
 
-  def update(index, key, m_table \\ :mcache) do
+  def inverse(index, key, m_table \\ :mcache) do
     case Mnesia.transaction(fn ->
            [{^m_table, ^index, data}] = Mnesia.read({m_table, index})
            Mnesia.write({m_table, index, Map.put(data, key, true)})
          end) do
-      {:atomic, :ok} -> :ok
+      {:atomic, :ok} -> MnDb2.read(index, m_table)
       {:aborted, reason} -> {:aborted, reason}
     end
   end
 
   def nodes(), do: Node.list()
-  def data(), do: :ets.tab2list(:mcache)
+  def data(), do: {node(), :ets.tab2list(:mcache)}
   def info(), do: :mnesia.system_info()
 
   # Node.disconnect(:"b@127.0.0.1")
