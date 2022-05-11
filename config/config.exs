@@ -7,7 +7,7 @@ config :logger, :console, format: "[$date $time] $message\n", colors: [enabled: 
 
 config :caching_an_api,
   cookie: :my_secret,
-  store: :ets,
+  store: :mn,
   mn_table: :mcache,
   ets_table: :ecache,
   disc_copy: nil

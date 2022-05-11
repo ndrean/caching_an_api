@@ -12,7 +12,7 @@ defmodule Api do
   # Api.stream_synced(1..2)
 
   def fetch(i, f) do
-    data = CacheGS.get(i)
+    data = Cache.get(i, @opts)
 
     case(data) do
       nil ->
@@ -22,7 +22,7 @@ defmodule Api do
         case @opts.store do
           :mn ->
             if !b1 && !b2 do
-              data = CacheGS.inverse(i, "completed")
+              data = Cache.inverse(i, "completed", @opts)
               fetch_or_update_cache(data["was_cached"], i, data)
             else
               fetch_or_update_cache(data["was_cached"], i, data)
@@ -41,7 +41,7 @@ defmodule Api do
 
       false ->
         new_data = Map.put(data, "was_cached", true)
-        CacheGS.put(i, new_data)
+        Cache.put(i, new_data, @opts)
         {:ok, {i, %{response: new_data}}}
     end
   end
@@ -91,7 +91,7 @@ defmodule Api do
           |> Poison.decode!()
           |> Map.put("was_cached", false)
 
-        CacheGS.put(i, body)
+        Cache.put(i, body, @opts)
         {:ok, {i, %{response: body}}}
 
       {:ok, {:error, %HTTPoison.Error{reason: reason}}} ->
@@ -109,7 +109,7 @@ defmodule Api do
           |> Poison.decode!()
           |> Map.put("was_cached", false)
 
-        CacheGS.put(i, body)
+        Cache.put(i, body, @opts)
         {i, %{response: body}}
 
       {:error, %HTTPoison.Error{reason: reason}} ->
