@@ -44,8 +44,23 @@ defmodule CacheGS do
   def init(opts) do
     # subscribe to node changes
     :ok = :net_kernel.monitor_nodes(true)
-
     state = opts
+
+    docker? = Application.get_env(:caching_an_api, :docker)
+
+    host = if(docker?, do: "redis", else: "127.0.0.1")
+
+    case Redix.start_link(host: host, port: 6379) do
+      {:ok, pid} ->
+        with {:ok, "PONG"} <- Redix.command(pid, ["ping"]) do
+          Logger.info("Redis is up")
+        else
+          {_, _} -> Logger.warn("no Redis")
+        end
+
+      {:error, %Redix.ConnectionError{reason: reason}} ->
+        Logger.info("Redis error: #{reason}")
+    end
 
     case opts[:store] do
       nil ->
@@ -112,18 +127,31 @@ defmodule CacheGS do
   @impl true
   def handle_info({:nodeup, _node}, state) do
     MnDb2.connect_mnesia_to_cluster(state)
+
     {:noreply, state}
   end
 
   @impl true
   def handle_info({:nodedown, _node}, state) do
-    MnDb2.update_mnesia_nodes()
+    # MnDb2.update_mnesia_nodes()
     {:noreply, state}
   end
 
   @impl true
-  def handle_info({:mnesia_system_event, info}, state) do
-    Logger.info("#{inspect(info)}")
+  def handle_info({:mnesia_system_event, message}, state) do
+    Logger.info("#{inspect(message)}")
+
+    with {:inconsistent_database, reason, _node} <- message do
+      # Logger.critical("#{reason} at #{node}")
+      Logger.warn("Error: #{inspect(reason)} ")
+      System.cmd("say", ["bye to #{node() |> to_string() |> String.at(0)}"])
+      send(__MODULE__, {:quit, {:shutdown, :network}})
+    end
+
     {:noreply, state}
+  end
+
+  def handle_info({:quit, {:shutdown, :network}}, state) do
+    {:stop, :shutdown, state}
   end
 end

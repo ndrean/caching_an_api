@@ -12,8 +12,8 @@ defmodule CachingAnApi.Application do
     topologies = Application.get_env(:libcluster, :topologies) || []
     opts = [strategy: :one_for_one, name: CachingAnApi.Supervisor]
 
-    cookie = Application.get_env(:caching_an_api, :cookie)
-    Node.set_cookie(cookie)
+    # cookie = Application.get_env(:caching_an_api, :cookie)
+    # Node.set_cookie(cookie)
 
     cache_opt = [
       store: Application.get_env(:caching_an_api, :store),
@@ -22,11 +22,13 @@ defmodule CachingAnApi.Application do
       disc_copy: Application.get_env(:caching_an_api, :disc_copy) || nil
     ]
 
-    cluster_type =
-      Application.get_env(:libcluster, :topologies)[:local_epmd][:strategy] ||
-        Application.get_env(:libcluster, :topologies)[:gossip_ex][:strategy]
+    cluster_type = [
+      cluster_type:
+        Application.get_env(:libcluster, :topologies)[:local_epmd][:strategy] ||
+          Application.get_env(:libcluster, :topologies)[:gossip_ex][:strategy]
+    ]
 
-    Logger.notice("Config: #{inspect(cache_opt ++ [cluster_type: cluster_type])}")
+    Logger.notice("Config: #{inspect(cache_opt ++ cluster_type)}")
 
     # start Ets with a table name
     EtsDb.init(cache_opt)
@@ -38,6 +40,9 @@ defmodule CachingAnApi.Application do
 
       # start Mnesia GenServer
       # {MnDb.Supervisor, cache_opt},
+
+      # start Redis adapter
+      {Redix, name: :redix},
 
       # start Cache GS
       {CacheGS.Supervisor, cache_opt}

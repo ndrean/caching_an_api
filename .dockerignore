@@ -1,0 +1,9 @@
+Docker*
+Read*
+.dock*
+.git*
+_build/
+deps/
+/.elixir*
+doc/
+test/

@@ -1,20 +1,27 @@
 # CachingAnApi
 
-To illustrate the usage of different in-build stores, we cache responses to HTTP calls with different solutions: (a GenServer), an Ets data store and a Mnesia database in the case of a distributed cluster and a CRDT solution.
+To illustrate the usage of different in-build stores, we cache responses to HTTP calls with different solutions: (a GenServer), an Ets data store and a Mnesia database in the case of a distributed cluster.
 
-> Other unused options here would rely on external databases, such as Redis with PubSub or Postgres with Listen/Notify.
+> Other unused options here would rely on external databases, such as Redis PubSub.
 
-There is a module Api for performing dummy HTTP requests. It calls a Cache module. The Cache module is a GenServer: it distributes the read/Write to te request data store, and monitors the nodes up/down to trigger Mnesia startup and Mnesia cluster update.
+[Testing] Install the `Redix` library and run a container opened on port say 6389:
 
-Two branches:
+`docker run --name redis-c --rm -p 6389:6379 redis:7.0.0-alpine  redis-server`
 
-- [master]: Mnesia is wrapped into a GenServer. We use Mnesia system events upt udpate the Mnesia cluster and start MNesia at node.
+and from within a node, connect with `{:ok, pid} = Redix.start_link(host: "0.0.0.0", port: 6389)` and test `Redix.command(pid, ["ping"])` and receive `{:ok, "PONG"}`.  Then `Redix.command(pid, ["set", "a", 1])` and `Redix.command(pid, ["get", "a"])`. Then test the [PubSub](https://hexdocs.pm/redix/Redix.PubSub.html#content).
 
-- [mnesia-no-gs]: Mnesia is directly accessible. We use Erlang node monitoring to start  and update the MNesia cluster.
+> Postgres with Listen/Notify.
+
+There is a module Api for performing dummy HTTP requests. It calls a Cache module.
+We put two options:
+
+- [master]: Cache is just a module that distributes the read/Write to the request data store. Mnesia is a GenServer: with Mnesia system event, it triggers Mnesia cluster startup and update.
+
+- [mnesia-no-gs]: Cache is a GenServer that uses Erlang's node monitoring to triger Mnesia start and cluter update. Then the Mnesia module is just a wrapper.
 
 You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia w/o disc persistance or CRDT. Set the `store: type` with `:mn` or `:ets` or `crdt` or `store: nil` (for the process state). Also set `disc_copy` to `:disc_copy` or `nil` if your want persistance on each node or not.
 
-EtsDb in just a module that wraps Ets, and Mnesia is or not a supervised GenServer since we want to handle network partition.
+EtsDb in just a module that wraps Ets, and Mnesia is/or not a supervised GenServer since we want to handle network partition.
 
 ## The stores
 
@@ -23,6 +30,7 @@ It is an in-build in-memory key-value data store localized in a node and it's li
 This data store is **not distributed**: other nodes within a cluster can't access to it.
 Data is saved with tuples and there is no need to serialize values.
 Since we launch Ets in it's own process, we used the flag `:public`. Any process can thus read and write from the Ets database. The operations have to be made atomic to avoid race conditions (for example, no write and then read within the same function as this could lead to inconsistancies). It then offers shared, concurrent read access to data (meaning scaling upon the number of CPUs used).
+
 A word about [performance between GenServer and Ets](<https://prying.io/technical/2019/09/01/caching-options-in-an-elixir-application.html>).
 
 > Check for the improved [ConCache](https://github.com/sasa1977/con_cache) with TTL support.
@@ -30,19 +38,14 @@ A word about [performance between GenServer and Ets](<https://prying.io/technica
 - [Mnesia](http://erlang.org/documentation/doc-5.2/pdf/mnesia-4.1.pdf)
 Mnesia is an in-build distributed in-memory and optionnally  disc persisted database build (node-based) for concurrency. It works both in memory (**with Ets**) and on disc. As Ets, it stores tuples.
 You can define tables whose structure is defined by a record type.
-In Mnesia, actions are wrapped within a **transaction**: if something goes wrong with executing a transaction, it will be rolled back and nothing will be saved on the database. The disc persistance is optional in Mnesia. Set `disc_copy: :disc_copy` or to `nil` in the "config.exs".
+In Mnesia, actions are wrapped within a **transaction**: if something goes wrong with executing a transaction, it will be rolled back and nothing will be saved on the database. This means the operations are `:atomic`,  meaning that all operations should occur or no operations should occur in case of an error. The disc persistance is optional in Mnesia. Set `disc_copy: :disc_copy` or to `nil` in the "config.exs".
 
   - storage capacity: from the [doc](https://www.erlang.org/faq/mnesia.html), it is indicated that:
     - for ram_copies and disc_copies, the entire table is kept in memory, so data size is limited by available RAM.
     - for disc_copies tables, the entire table needs to be read from disk to memory on node startup, which can take a long time for large table.
 
-  - `:atomic` means that all operations should occur or no operations should occur in case of an error.
-
 > What's the point of using Mnesia? If you need to keep a database that will be used by multiple processes and/or nodes, using Mnesia means you don't have to write your own access controls.
 > Furthermore, a [word about scalability performance of Mnesia](http://www.dcs.gla.ac.uk/~amirg/publications/DE-Bench.pdf) and [here](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang) and [here](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang).
-
-- [CRDT](https://github.com/derekkraan/delta_crdt_ex)
-DeltaCrdt implements a key/value store using concepts from Delta CRDTs. A CRDT can be used as a distributed temporary caching mechanism that is synced across our Cluster. A good introduction to [CRDT](https://moosecode.nl/blog/how_deltacrdt_can_help_write_distributed_elixir_applications).
 
 ## The Erlang cluster
 
@@ -144,12 +147,52 @@ To disconnect a node from another, run:
 iex(:a@127.0.0.1)> Node.disconnect(:"b@127.0.0.1")
 ```
 
-[TODO] With the compiled code:
+[Releases] Following the [releases guide](https://elixir-lang.org/getting-started/mix-otp/config-and-releases.html), you set in `Mix.Projects`:
+
+First assemble [multiple releases](https://elixir-lang.org/getting-started/mix-otp/config-and-releases.html#assembling-multiple-releases):
+
+```elixir
+# mix.exs
+releases: [
+  a: [
+    version: "0.0.1",
+    applications: [caching_an_api: :permanent],
+    cookie: "release_secret"
+  ],
+  b: [
+    version: "0.0.1",
+    applications: [caching_an_api: :permanent],
+    cookie: "release_secret"
+  ]
+]
+```
+
+Then since releases are OS dependant, you need to [configure for the OS](https://elixir-lang.org/getting-started/mix-otp/config-and-releases.html#operating-system-environment-configuration) by seeting **env** variables.
+
+Run:
 
 ```bash
-# file vm.args contains name and cookie
-./bin/...
+mix release.init # -> creates env.sh files
 ```
+
+Since we want to set the `--name` attribute since we run distributed, we modify the ENV variables:
+
+```bash
+#env.sh.eex
+export RELEASE_DISTRIBUTION=name
+export RELEASE_NODE=<%= @release.name %>@127.0.0.1
+```
+
+and run:
+
+ ```bash
+ > mix release a  #<- where "a" is the version set in mix
+ > _build/dev/rel/a/bin/a start_iex
+
+ # and in another terminal:
+> mix release b  #<- where "a" is the version set in mix
+> _build/dev/rel/b/bin/b start_iex
+ ```
 
 #### Automatic Cluster connection: `libcluster`
 
@@ -182,13 +225,8 @@ then you see:
 ```elixir
 iex(:a@127.0.0.1)> :rpc.call(:"b@127.0.0.1", EtsDb, :get, [1] )
 "a"
-
 iex(:c@127.0.0.1)> for node <- Node.list(), do: {node, :rpc.call(node, EtsDb, :get, [1])}
 ["a@127.0.0.1": "a", "b@127.0.0.1": "b"]
-
-# or use `multicall`-> {sucess, failure}
-iex(:c@127.0.0.1)> :rpc.multicall(EtsDb, :get, [1])
-{["a@127.0.0.1": "a", "b@127.0.0.1": "b"], []}
 ```
 
 Suppose we have a client function `Module.nodes` implemented with a callback `:nodes` within a GenServer, then you can use `GenServer.call` to run a remote function on another node (be careful with the construction of the functions with the brackets "}").
@@ -202,6 +240,10 @@ iex(c@127.0.0.1)> for node <- Node.list(), do: {node, GenServer.call({MnDb, node
   "a@127.0.0.1": [:"b@127.0.0.1", :"c@127.0.0.1"],
   "b@127.0.0.1": [:"a@127.0.0.1", :"c@127.0.0.1"]
 ]
+
+# or use `multicall`-> {sucess, failure}
+iex(:c@127.0.0.1)> :rpc.multicall(EtsDb, :get, [1])
+{["a@127.0.0.1": "a", "b@127.0.0.1": "b"], []}
 ```
 
 ## Ets
@@ -259,131 +301,17 @@ We use the Mnesia system event handler by declaring `:mnesia.subscribe(:system)`
 
 > DONT add `:mnesia` in the MixProject application `:extra_applications` since you will need to start it manually. Instead, add `included_applications: [:mnesia]`. This will also remove the warnings in VSCode. The reason is that you need to firstly create the schema (meaning you create the database), and only then start Mnesia.
 
-The sequence is:
-
-1. `:mnesia.create_schema` to create a new database.
-
-2. `:mnesia.start()`
-
-3. `:mnesia.create_table` where you specify the rows and also that you want a disc copy for your node. The parameter `disc_copies: [node()]` means that data is stored both on disc and in the memory.
-
-4. The disc copy directory can be specified in the `config.exs` file.
+The sequence is:  `:mnesia.create_schema` to create a new database, then  `:mnesia.start()`, then `:mnesia.create_table` where you specify the rows and also that you want a disc copy for your node. The parameter `disc_copies: [node()]` means that data is stored both on disc and in the memory. Finally, the disc copy directory can be specified in the `config.exs` file.
 
 ### Distributed Mnesia startup
+
+You can choose wether to wrap Mnesia within a GenServer (branch master) or Cache (branch mnesia-no-gs). To overcome the cookie problem if you start Mnesia with a process (a `GenSever.start_link` or `GenServer.init`), you may use an event callback, `nodeup` and `mnesia_up` in respectively `Cache` and `MnDb` to trigger the following start-up sequence. Indeed, the Mnesia cluster start-up will be triggered only when 2 nodes are present - which makes sense.
 
 The sequence is:
 
 - start Mnesia. Two options: declare `[extra_applications: [:mnesia]` in MixProject  or use `:mnesia.start()`.
 - connect nodes and inform Mnesia that other nodes belong to the cluster,
 - ensure that data (schema and table) are stored on disc. Two copy functions are used, depending if it's the schema or table.
-
-```elixir
-def connect_mnesia_to_cluster(name) do   
-    # intial state
-    -> on a@node
-    running db nodes   = []
-    stopped db nodes   = [a@MacBookND]
-
-    -> on b@node
-    running db nodes   = [a@MacBookND,b@MacBookND]
-    remote             = [mcache]
-    ram_copies         = [schema]
-    disc_copies        = []
-    [{a@MacBookND,disc_copies}] = [mcache]
-    [{a@MacBookND,disc_copies},{b@MacBookND,ram_copies}] = [schema]
-
-    :mnesia.start()
-      -> on a@node
-      opt_disc. Directory "../mndb_a@MacBookND" is NOT used
-      running db nodes   = [a@MacBookND]
-      remote             = []
-      ram_copies         = [schema]
-      disc_copies        = []
-      [{a@MacBookND,ram_copies}] = [schema]
-
-      -> on b@node
-      opt_disc. Directory "../mndb_b@MacBookND" is NOT used
-      running db nodes   = [a@MacBookND,b@MacBookND]
-      remote             = [mcache]
-      ram_copies         = [schema]
-      disc_copies        = []
-      [{a@MacBookND,disc_copies}] = [mcache]
-      [{a@MacBookND,disc_copies},{b@MacBookND,ram_copies}] = [schema]
-
-    :mnesia.change_config(:extra_db_nodes, Node.list())
-    # => connects nodes and copies the schema in RAM to the new connected node
-      -> on a@node
-      opt_disc. Directory "../mndb_a@MacBookND" is NOT used
-      running db nodes   = [a@MacBookND]
-      remote             = []
-      ram_copies         = [schema]
-      disc_copies        = []
-      [{a@MacBookND,ram_copies}] = [schema]
-
-      -> on b@node
-      opt_disc. Directory "../mndb_b@MacBookND" is NOT used
-      running db nodes   = [b@MacBookND,a@MacBookND]
-      remote             = [mcache]
-      ram_copies         = [schema]
-      disc_copies        = []
-      [{a@MacBookND,ram_copies},{b@MacBookND,ram_copies}] = [schema]
-
-
-    :mnesia.change_table_copy_type(:schema, node(), :disc_copies)
-      -> on a@node
-      opt_disc. Directory "../mndb_a@MacBookND" is used
-      remote             = []
-      ram_copies         = []
-      disc_copies        = [schema]
-      [{a@MacBookND,disc_copies}] = [schema]
-
-      -> on b@node
-      opt_disc. Directory "../mndb_b@MacBookND" is used
-      running db nodes   = [b@MacBookND,a@MacBookND]
-      remote             = [mcache]
-      ram_copies         = []
-      disc_copies        = [schema]
-      [{a@MacBookND,disc_copies}] = [mcache]
-      [{a@MacBookND,disc_copies},{b@MacBookND,disc_copies}] = [schema]
-
-    
-    :mnesia.create_table(:table,attributes...,disc_copies: [node()]) 
-      -> on a@node
-      remote             = []
-      ram_copies         = []
-      disc_copies        = [mcache,schema]
-      [{a@MacBookND,disc_copies}] = [mcache, schema]
-
-      -> on b@node
-      remote             = [mcache]
-      ram_copies         = []
-      disc_copies        = [schema]
-      [{a@MacBookND,disc_copies},{b@MacBookND,disc_copies}] = [schema]
-
-
-    :mnesia.add_table_copy(:table, node(), :disc_copies)
-      remote             = []
-      ram_copies         = []
-      disc_copies        = [mcache,schema]
-      [{a@MacBookND,disc_copies},{b@MacBookND,disc_copies}] = [schema,mcache]
-end
-  ```
-
-Code used:
-
-```bash
-:mnesia.system_info()
-MnDb.ensure_start(name)
-:mnesia.system_info()
-MnDb.update_mnesia_nodes()
-:mnesia.system_info()
-MnDb.ensure_table_from_ram_to_disc_copy(:schema)
-:mnesia.system_info()
-MnDb.ensure_table_create(name)
-:mnesia.system_info()
-MnDb.ensure_table_copy_exists_at_node(name)
-:mnesia.system_info()
-```
 
 ## Debug
 
@@ -432,9 +360,13 @@ An important difference between passing messages and calling methods is that mes
 
 ### Elixir notes
 
-[handle_continue](https://elixirschool.com/blog/til-genserver-handle-continue/)
+[handle_continue](https://elixirschool.com/blog/til-genserver-handle-continue/) and [handle_call :noreply](https://moosecode.nl/blog/elixir-tip-noreply-killer-feature).
+
+[Startup, where?](https://moosecode.nl/blog/where-do-i-put-startup-code-in-elixir)
 
 [GernServer stop](https://alexcastano.com/how-to-stop-a-genserver-in-elixir/)
+
+[Handling events](https://mkaszubowski.com/2021/01/09/elixir-event-handling.html)
 
 ### Production release
 
@@ -443,7 +375,7 @@ Take a look at [Render](https://render.com/docs/deploy-elixir-cluster) and [Giga
 ```bash
 mix phx.gen.secret
 xxxx
-export SCRET_KEY_BASE="xxxx"
+export SECRET_KEY_BASE="xxxx"
 MIX_ENV=prod mix setup
 MIX_ENV=prod mix release
 ```

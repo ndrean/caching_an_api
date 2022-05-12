@@ -4,9 +4,9 @@ defmodule Api do
   @url "https://jsonplaceholder.typicode.com/todos/"
 
   @opts %{
-    store: Application.get_env(:caching_an_api, :store) || :ets,
-    mn_table: Application.get_env(:caching_an_api, :mn_table) || :mcache,
-    ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache
+    store: Application.compile_env(:caching_an_api, :store) || :ets,
+    mn_table: Application.compile_env(:caching_an_api, :mn_table) || :mcache,
+    ets_table: Application.compile_env(:caching_an_api, :ets_table) || :ecache
   }
 
   # Api.stream_synced(1..2)
