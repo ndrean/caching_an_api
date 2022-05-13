@@ -8,8 +8,8 @@ FROM  bitwalker/alpine-elixir:latest AS build
 RUN elixir -v
 
 # Accept MIX_ENV as build arg
-ARG MIX_ENV=$MIX_ENV
-ARG REL_NAME=$REL_NAME
+ARG MIX_ENV=${MIX_ENV:-dev}
+ARG REL_NAME=${REL_NAME:-rel_a}
 
 # Set current working directory for next steps
 WORKDIR /opt/release
@@ -29,8 +29,8 @@ RUN adduser -h /opt/app -D app \
 FROM alpine:latest AS app
 
 # Accept MIX_ENV as build arg
-ARG MIX_ENV=$MIX_ENV
-ARG REL_NAME=$REL_NAME
+ARG MIX_ENV=${MIX_ENV:-dev}
+ARG REL_NAME=${REL_NAME:-rel_a}
 
 # Install system dependencies required for your app at runtime
 RUN apk --update --no-cache add bash openssl ncurses-libs tini libstdc++ libgcc
@@ -54,4 +54,4 @@ COPY --from=build /opt/release/_build/$MIX_ENV/rel/${REL_NAME} ./
 # ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 
 # Start your app
-CMD ["./bin/a", "start_iex"]
+CMD ["./bin/rel_a", "start_iex"]

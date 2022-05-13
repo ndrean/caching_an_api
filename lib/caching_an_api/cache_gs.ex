@@ -44,6 +44,11 @@ defmodule CacheGS do
   def init(opts) do
     # subscribe to node changes
     :ok = :net_kernel.monitor_nodes(true)
+
+    # an exit signal is sent when a linked process exits or its node is disconnected.
+    # to trigger the `terminate()` function, use:
+    Process.flag(:trap_exit, true)
+
     state = opts
 
     docker? = Application.get_env(:caching_an_api, :docker)
@@ -144,14 +149,20 @@ defmodule CacheGS do
     with {:inconsistent_database, reason, _node} <- message do
       # Logger.critical("#{reason} at #{node}")
       Logger.warn("Error: #{inspect(reason)} ")
-      System.cmd("say", ["bye to #{node() |> to_string() |> String.at(0)}"])
       send(__MODULE__, {:quit, {:shutdown, :network}})
     end
 
     {:noreply, state}
   end
 
+  @impl true
   def handle_info({:quit, {:shutdown, :network}}, state) do
-    {:stop, :shutdown, state}
+    System.cmd("say", ["bye to #{node() |> to_string() |> String.at(0)}"])
+    {:stop, state}
+  end
+
+  @impl true
+  def terminate(_, _state) do
+    Logger.warn("GS stopped")
   end
 end

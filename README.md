@@ -50,9 +50,15 @@ In Mnesia, actions are wrapped within a **transaction**: if something goes wrong
 ## The Erlang cluster
 
 In an Erlang cluster, all nodes are fully connected, with N(N-1)/2 <=> O(N^2) TCP/IP connections.
-A [word](http://dcs.gla.ac.uk/~natalia/sd-erlang-improving-jpdc-16.pdf) on full P2P Erlang clusters. The performance plateau at 40 nodes and do not scale beyond 60 nodes.
+A [word](http://dcs.gla.ac.uk/~natalia/sd-erlang-improving-jpdc-16.pdf) on full P2P Erlang clusters. The performance plateau at 40 nodes and does not scale beyond 60 nodes.
 
-To create a cluster, from an **IEX** session, you need to pass a name to connect the nodes and pass the same cookie to each node.
+### TL;TR
+
+To create a cluster, you need to pass a *name* and a *cookie* to connect transitively to the nodes.
+
+- from an **IEX** session: `iex --name n1@127.0.0.1 --cookie my_secret -S mix`
+
+- from a **release**: `./bin/my_app start` with `name` and `cookie` as set in **"env.sh.eex"*.
 
 ### Launch the nodes
 
@@ -60,10 +66,10 @@ To create a cluster, from an **IEX** session, you need to pass a name to connect
 
 ```elixir
 # term 1
-> iex --sname a --cookie :my_secret -S mix
+> iex --sname a --cookie my_secret -S mix
 iex(a@MacBookND)>
 # or
-> iex --name A@127.0.0.1  --cookie :my_secret -S  mix
+> iex --name A@127.0.0.1  --cookie my_secret -S  mix
 iex(A@127.0.0.1)>
 ```
 
@@ -71,11 +77,11 @@ So to launch 3 nodes, run in 3 separate terminals:
 
 ```elixir
 #t1
-> iex --name A@127.0.0.1  --cookie :my_secret -S  mix
+> iex --name A@127.0.0.1  --cookie my_secret -S  mix
 #t2
-> iex --name A@127.0.0.1  --cookie :my_secret -S  mix
+> iex --name A@127.0.0.1  --cookie my_secret -S  mix
 #t3
-> iex --name A@127.0.0.1  --cookie :my_secret -S  mix
+> iex --name A@127.0.0.1  --cookie my_secret -S  mix
 ```
 
 #### Automatic launch of IEX sessions in new terminals
@@ -87,7 +93,7 @@ On MacOS, `chmod +x` the following:
 # ! /bin/bash
 for i in a b c d
 do
-    osascript -e "tell application \"Terminal\" to do script \"iex --sname "$i" -S mix\""
+    osascript -e "tell application \"Terminal\" to do script \"iex --sname "$i" --cookie my_secret -S mix\""
 done
 ```
 
@@ -97,7 +103,7 @@ Alternatively, use [ttab](https://www.npmjs.com/package/ttab)
 host="@127.0.0.1"
 for i in a1 b1 c1
 do
-  ttab iex name "$i$host" -S mix
+  ttab iex name "$i$host" --cookie my_secret -S mix
 end
 ```
 

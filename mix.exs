@@ -37,13 +37,11 @@ defmodule CachingAnApi.MixProject do
 
   defp releases() do
     [
-      a: [
-        version: "0.0.1",
+      rel_a: [
         applications: [caching_an_api: :permanent],
         cookie: "release_secret"
       ],
       b: [
-        version: "0.0.1",
         applications: [caching_an_api: :permanent],
         cookie: "release_secret"
       ]

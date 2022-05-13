@@ -1,5 +1,8 @@
 defmodule CacheGS.Supervisor do
-  use Supervisor
+  @moduledoc """
+  With `:transient`, the child process is restarted only if it terminates abnormally, i.e., with an exit reason other than :normal, :shutdown, or {:shutdown, term}.
+  """
+  use Supervisor, restart: :transient
 
   def start_link(init_args) do
     Supervisor.start_link(__MODULE__, init_args, name: __MODULE__)

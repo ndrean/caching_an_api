@@ -7,3 +7,7 @@ deps/
 /.elixir*
 doc/
 test/
+.dock*
+.gitig*
+/test/
+/k8/
