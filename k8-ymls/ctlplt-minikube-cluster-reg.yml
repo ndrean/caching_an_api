@@ -1,0 +1,6 @@
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: minikube
+registry: ctlptl-minikube-registry
+kubernetesVersion: v1.23.3
+minCPUs: 3

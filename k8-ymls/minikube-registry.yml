@@ -1,0 +1,4 @@
+apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+port: 5000
+listenAddress: 127.0.0.1

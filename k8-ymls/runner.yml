@@ -1,0 +1,51 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: runner
+  namespace: stage
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp
+
+  template:
+    metadata:
+      namespace: stage
+      labels:
+        app: myapp
+
+    spec:
+      serviceAccountName: discoverer
+      containers:
+        - name: myapp
+          image: mix-cluster
+          imagePullPolicy: "Always" #"IfNotPresent"
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+          tty: true
+          stdin: true
+          # ports:
+          #   - name: epmd
+          #     containerPort: 4369
+          #     protocol: TCP
+          env:
+            - name: ERLANG_COOKIE
+              value: "release_secret"
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          # command: ["bash"]
+          # args:
+          #   - "-c"
+          #   - iex --cookie $(echo $ERLANG_COOKIE) --name $(echo k8_cluster@$(echo $POD_IP)) -S mix
+
+          # iex --cookie $(echo $ERLANG_COOKIE) --name $(echo k8_cluster@$(echo $POD_IP)) -S mix

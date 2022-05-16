@@ -9,6 +9,7 @@ defmodule CacheGS do
   """
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    # debug: [:statistics, :trace]
   end
 
   @doc """
@@ -44,13 +45,23 @@ defmodule CacheGS do
   def init(opts) do
     # subscribe to node changes
     :ok = :net_kernel.monitor_nodes(true)
+    Process.flag(:trap_exit, true)
 
-    {:ok, opts}
+    state = opts
+
+    case opts[:store] do
+      nil ->
+        state = Enum.into(opts, %{}) |> Map.put(:req, %{})
+        {:ok, state}
+
+      _ ->
+        {:ok, state}
+    end
   end
 
   @impl true
   def handle_call({:inverse, index, key}, _from, state) do
-    reply = if state[:store] == :mn, do: MnDb.inverse(index, key, state[:mn_table])
+    reply = if state[:store] == :mn, do: MnDb2.inverse(index, key, state[:mn_table])
 
     {:reply, reply, state}
   end
@@ -60,7 +71,7 @@ defmodule CacheGS do
     cache =
       case state[:store] do
         :mn ->
-          MnDb.read(key, state[:mn_table])
+          MnDb2.read(key, state[:mn_table])
 
         :ets ->
           EtsDb.get(key, state[:ets_table])
@@ -69,7 +80,7 @@ defmodule CacheGS do
           nil
 
         nil ->
-          state[key]
+          state.req[key]
       end
 
     {:reply, cache, state}
@@ -84,14 +95,14 @@ defmodule CacheGS do
           state
 
         :mn ->
-          MnDb.write(key, data, state[:mn_table])
+          MnDb2.write(key, data, state[:mn_table])
           state
 
         :dcrt ->
           nil
 
         nil ->
-          Map.put(state, key, data)
+          %{state | req: Map.put(state.req, key, data)}
       end
 
     {:noreply, new_state}
@@ -102,13 +113,37 @@ defmodule CacheGS do
   """
   @impl true
   def handle_info({:nodeup, _node}, state) do
-    # MnDb2.update_mnesia_nodes()
+    Logger.debug("#{inspect(node())} is UP!")
+    MnDb2.connect_mnesia_to_cluster(state[:mn_table], state[:disc_copy])
     {:noreply, state}
   end
 
   @impl true
   def handle_info({:nodedown, _node}, state) do
-    # MnDb2.update_mnesia_nodes()
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:mnesia_system_event, message}, state) do
+    Logger.info("#{inspect(message)}")
+
+    with {:inconsistent_database, reason, _node} <- message do
+      # Logger.critical("#{reason} at #{node}")
+      Logger.warn("Error: #{inspect(reason)} ")
+      send(__MODULE__, {:quit, {:shutdown, :network}})
+    end
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:quit, {:shutdown, :network}}, state) do
+    System.cmd("say", ["bye to #{node() |> to_string() |> String.at(0)}"])
+    {:stop, state}
+  end
+
+  @impl true
+  def terminate(_, _state) do
+    Logger.warn("GS stopped")
   end
 end

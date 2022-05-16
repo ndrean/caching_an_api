@@ -4,20 +4,15 @@ ARG BUILD_ENV=prod
 ARG BUILD_REL=my_app
 
 # Install system dependencies
-RUN mix local.hex --force
-RUN mix local.rebar --force
+RUN mix local.hex --force && mix local.rebar --force
 
 # Add sources
-ADD . /workspace/
 WORKDIR /workspace
 
 ENV MIX_ENV=${BUILD_ENV}
 
 # Fetch dependencies
-RUN mix deps.get
-
-# Build project
-RUN mix compile
+RUN mix deps.get && mix compile
 
 # Run test-suite
 RUN mix test --cover

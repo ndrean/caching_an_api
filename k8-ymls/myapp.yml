@@ -1,0 +1,45 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: myapp
+  namespace: stage
+
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: myapp
+
+  template:
+    metadata:
+      namespace: stage
+      labels:
+        app: myapp
+
+    spec:
+      serviceAccountName: discoverer
+      containers:
+        - name: myapp
+          image: rel-cluster
+          imagePullPolicy: "Always"
+
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+
+          tty: true
+          stdin: true
+          # ports:
+          #   - containerPort: <Port>
+          env:
+            - name: ERLANG_COOKIE
+              value: "release_secret"
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP

@@ -1,5 +1,5 @@
 defmodule CacheGS.Supervisor do
-  use Supervisor
+  use Supervisor, restart: :transient
 
   def start_link(init_args) do
     Supervisor.start_link(__MODULE__, init_args, name: __MODULE__)

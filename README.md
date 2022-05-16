@@ -1,6 +1,8 @@
 # CachingAnApi
 
-To illustrate the usage of different in-build stores, we cache responses to HTTP calls with different solutions: (a GenServer), an Ets data store and a Mnesia database in the case of a distributed cluster and a CRDT solution.
+iex --cookie "$(echo $ERLANG_COOKIE)" --name "$(echo myapp@$(echo $POD_IP))" -S mix
+
+To illustrate the usage of different in-build stores, we cache responses to HTTP calls with different solutions: (a GenServer), an Ets data store and a Mnesia database in the case of a distributed cluster.
 
 > Other unused options here would rely on external databases, such as Redis with PubSub or Postgres with Listen/Notify.
 
@@ -14,6 +16,14 @@ We put two options:
 You can configure which store is used: the state of the Cache GenServer, Ets or Mnesia w/o disc persistance or CRDT. Set the `store: type` with `:mn` or `:ets` or `crdt` or `store: nil` (for the process state). Also set `disc_copy` to `:disc_copy` or `nil` if your want persistance on each node or not.
 
 EtsDb in just a module that wraps Ets, and Mnesia is/or not a supervised GenServer since we want to handle network partition.
+
+## Debbuging
+
+[Nice source](https://staknine.com/debugging-elixir-phoenix/)
+
+## RBAC
+
+[Nice source](https://octopus.com/blog/k8s-rbac-roles-and-bindings)
 
 ## The stores
 
@@ -318,6 +328,7 @@ An important difference between passing messages and calling methods is that mes
 [GernServer stop](https://alexcastano.com/how-to-stop-a-genserver-in-elixir/)
 
 [Handling events](https://mkaszubowski.com/2021/01/09/elixir-event-handling.html)
+
 ### Production release
 
 Take a look at [Render](https://render.com/docs/deploy-elixir-cluster) and [Gigalixir](https://gigalixir.com/#/about) and [fly.io](https://fly.io/docs/getting-started/elixir/)

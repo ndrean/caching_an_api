@@ -8,6 +8,7 @@ defmodule CachingAnApi.MixProject do
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      releases: releases(),
       elixirc_options: [debug_info: Mix.env() == :dev]
     ]
   end
@@ -29,6 +30,15 @@ defmodule CachingAnApi.MixProject do
       {:libcluster, "~> 3.3"},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false}
+    ]
+  end
+
+  defp releases do
+    [
+      myapp: [
+        applications: [caching_an_api: :permanent]
+        # cookie: "my_secret"
+      ]
     ]
   end
 end

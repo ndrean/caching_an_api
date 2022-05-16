@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: erl_cookie
+type: Opaque
+data:
+  ERLANG_COOKIE: cmVsZWFzZV9zZWNyZXQ=

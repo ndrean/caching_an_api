@@ -37,12 +37,12 @@ defmodule MnDb2 do
     end
   end
 
-  def update(index, key, m_table \\ :mcache) do
+  def inverse(index, key, m_table \\ :mcache) do
     case Mnesia.transaction(fn ->
            [{^m_table, ^index, data}] = Mnesia.read({m_table, index})
            Mnesia.write({m_table, index, Map.put(data, key, true)})
          end) do
-      {:atomic, :ok} -> :ok
+      {:atomic, :ok} -> MnDb2.read(index, m_table)
       {:aborted, reason} -> {:aborted, reason}
     end
   end
@@ -123,7 +123,7 @@ defmodule MnDb2 do
   We ensure that the `:schema` table is of type `disc_copies` since a `ram_copies`type schema doesn't allow other disc-resident tables.
   """
   def ensure_schema_from_ram_to_disc_copy(disc_copy) do
-    with :disc_copy <- disc_copy,
+    with true <- disc_copy,
          :ok <- wait_for(:schema) do
       case Mnesia.change_table_copy_type(:schema, node(), :disc_copies) do
         {:atomic, :ok} ->
@@ -144,7 +144,7 @@ defmodule MnDb2 do
   def ensure_table_create(name, disc_copy) do
     table =
       case disc_copy do
-        :disc_copy ->
+        true ->
           Mnesia.create_table(
             name,
             access_mode: :read_write,
@@ -155,7 +155,7 @@ defmodule MnDb2 do
 
         _ ->
           Mnesia.create_table(
-            name,
+            :mcache,
             access_mode: :read_write,
             attributes: [:post_id, :data],
             type: :ordered_set
@@ -179,8 +179,8 @@ defmodule MnDb2 do
   @doc """
   This one is needed to disc-copy the "remote" data table to the new node.
   """
-  def set_table_type_at_node(name, type_copy) do
-    type = if type_copy != :disc_copy, do: :ram_copies, else: :disc_copies
+  def set_table_type_at_node(name, disc_copy) do
+    type = unless disc_copy, do: :ram_copies, else: :disc_copies
 
     with :ok <- wait_for(name) do
       case Mnesia.add_table_copy(name, node(), type) do
@@ -199,7 +199,7 @@ defmodule MnDb2 do
       end
     else
       {:error, :ensure_table} ->
-        set_table_type_at_node(name, type_copy)
+        set_table_type_at_node(name, disc_copy)
     end
   end
 

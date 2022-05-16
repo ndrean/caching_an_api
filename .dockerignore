@@ -1,0 +1,12 @@
+Docker*
+READ*
+.dockerignore
+.gitignore
+_build/
+/deps/
+/.elixir*
+/doc/
+/test/
+k8/
+Tilt*
+logs*
