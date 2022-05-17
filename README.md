@@ -1,7 +1,5 @@
 # CachingAnApi
 
-iex --cookie "$(echo $ERLANG_COOKIE)" --name "$(echo myapp@$(echo $POD_IP))" -S mix
-
 To illustrate the usage of different in-build stores, we cache responses to HTTP calls with different solutions: (a GenServer), an Ets data store and a Mnesia database in the case of a distributed cluster.
 
 > Other unused options here would rely on external databases, such as Redis with PubSub or Postgres with Listen/Notify.
@@ -324,6 +322,13 @@ kubectl attach myapp-89b6ddf5-kjmw4 -i
 iex(myapp@10.42.0.116)2>
 ```
 
+or
+
+```bash
+kubectl exec -it runner--89b6ddf5-kjmw4 -- sh
+bash# iex --cookie "$(echo $ERLANG_COOKIE)" --name "$(echo myapp@$(echo $POD_IP))" -S mix
+iex(myapp@10.42.0.116)2>
+```
 
 ## Actor model vs Object-Orientated
 

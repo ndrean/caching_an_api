@@ -1,0 +1,5 @@
+{
+   "yaml.schemas": {
+      "kubernetes://schema/v1@service+apps/v1@deployment": "file:///Users/utilisateur/Exercism/elixir/caching_an_api/dep_headless.yml"
+   }
+}

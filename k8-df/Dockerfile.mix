@@ -18,5 +18,8 @@ COPY config config
 RUN mix deps.get --only $MIX_ENV && mix deps.compile
 
 COPY lib ./lib
+COPY / ./
 RUN mix compile
-CMD ["bash"]
+
+# ENTRYPOINT ["./entrypoint.sh"]
+CMD ["sh"]

@@ -1,9 +1,12 @@
 apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
 product: k3d
-registry: ctlptl-k3d-registry
+registry: k3d-reg
+
 ---
 apiVersion: ctlptl.dev/v1alpha1
 kind: Registry
-name: ctlptl-registry
-port: 5005
+name: k3d-reg
+labels:
+  "app": "k3d"
+  "k3d.role": "registry"

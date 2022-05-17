@@ -9,6 +9,7 @@ defmodule CachingAnApi.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       releases: releases(),
+      escript: escript(),
       elixirc_options: [debug_info: Mix.env() == :dev]
     ]
   end
@@ -27,9 +28,9 @@ defmodule CachingAnApi.MixProject do
       {:poison, "~> 5.0"},
       {:benchee, "~> 1.1"},
       {:jason, "~> 1.3"},
-      {:libcluster, "~> 3.3"},
-      {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false}
+      {:libcluster, "~> 3.3"}
+      # {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
+      # {:ex_doc, "~> 0.21", only: :dev, runtime: false}
     ]
   end
 
@@ -40,5 +41,9 @@ defmodule CachingAnApi.MixProject do
         # cookie: "my_secret"
       ]
     ]
+  end
+
+  defp escript do
+    [main_module: CachingAnApi.CLI]
   end
 end

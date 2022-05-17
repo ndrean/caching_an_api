@@ -167,7 +167,7 @@ defmodule MnDb2 do
         :ok
 
       {:aborted, {:already_exists, _name}} ->
-        Logger.info("Table #{name} already present at #{node()}")
+        # Logger.info("Table #{name} already present at #{node()}")
         :ok
 
       {:aborted, reason} ->

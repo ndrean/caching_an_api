@@ -7,13 +7,15 @@ config :mnesia,
 
 config :logger, :console, format: "[$date $time] $message\n", colors: [enabled: true]
 
-# config :caching_an_api,
-#   store: :mn,
-#   mn_table: :mcache,
-#   ets_table: :ecache,
-#   disc_copy: nil
-
-# store: :mn or :ets or nil
-# disc_copy: true or false, nil
+config :caching_an_api,
+  # :gossip_cluster or :k8_cluster
+  cluster_type: :k8_cluster,
+  # namespace: "stage",
+  # :mn or :ets or nil
+  store: :mn,
+  mn_table: :mcache,
+  ets_table: :ecache,
+  # true or false
+  disc_copy: true
 
 import_config "#{Mix.env()}.exs"

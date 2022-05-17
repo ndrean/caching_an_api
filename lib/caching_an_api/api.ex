@@ -4,9 +4,9 @@ defmodule Api do
   @url "https://jsonplaceholder.typicode.com/todos/"
 
   @opts %{
-    store: Application.get_env(:caching_an_api, :store) || :ets,
-    mn_table: Application.get_env(:caching_an_api, :mn_table) || :mcache,
-    ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache
+    store: Application.get_env(:caching_an_api, :store),
+    mn_table: Application.get_env(:caching_an_api, :mn_table),
+    ets_table: Application.get_env(:caching_an_api, :ets_table)
   }
 
   # Api.stream_synced(1..2)
@@ -23,7 +23,6 @@ defmodule Api do
           :mn ->
             if !b1 && !b2 do
               data = CacheGS.inverse(i, "completed")
-
               fetch_or_update_cache(data["was_cached"], i, data)
             else
               fetch_or_update_cache(data["was_cached"], i, data)

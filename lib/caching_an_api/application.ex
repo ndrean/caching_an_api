@@ -10,27 +10,28 @@ defmodule CachingAnApi.Application do
 
     opts = [strategy: :one_for_one, name: CachingAnApi.Supervisor]
 
-    cache_opt = [
-      store: Application.get_env(:caching_an_api, :store) || :ets,
+    ####### change config in runtime.exs (store, libcluster) #########
+    app_opt = [
+      store: Application.get_env(:caching_an_api, :store) || nil,
       mn_table: Application.get_env(:caching_an_api, :mn_table) || :mcache,
       ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache,
-      disc_copy: Application.get_env(:caching_an_api, :disc_copy) || nil
+      disc_copy: Application.get_env(:caching_an_api, :disc_copy) || false,
+      cluster_type: Application.get_env(:caching_an_api, :cluster_type) || :gossip_cluster
     ]
 
-    ####### set me! #########
-    cluster_type = :k8_cluster
-    Logger.notice("Config: #{inspect(cache_opt ++ [cluster_type: cluster_type])}")
+    Logger.notice("Config: #{inspect(app_opt)}")
     Logger.debug("#{inspect(node())}, #{inspect(Node.get_cookie())}")
 
     ### Init Ets #######
-    EtsDb.init(cache_opt)
+    EtsDb.init(app_opt)
 
     # list to be supervised
     [
       # start libcluster
-      {Cluster.Supervisor, [topology(cluster_type), [name: CachingAnApi.ClusterSupervisor]]},
+      {Cluster.Supervisor,
+       [topology(app_opt[:cluster_type]), [name: CachingAnApi.ClusterSupervisor]]},
       # start Cache GS
-      {CacheGS.Supervisor, cache_opt}
+      {CacheGS.Supervisor, app_opt}
     ]
     |> Supervisor.start_link(opts)
   end
@@ -50,7 +51,8 @@ defmodule CachingAnApi.Application do
               polling_interval: 10_000,
               kubernetes_selector: "app=myapp",
               kubernetes_node_basename: "myapp",
-              kubernetes_namespace: Application.get_env(:caching_an_api, :namespace)
+              kubernetes_namespace: System.get_env("NAMESPACE")
+              # kubernetes_namespace: Application.get_env(:caching_an_api, :namespace)
             ]
           ]
         ]
@@ -65,6 +67,14 @@ defmodule CachingAnApi.Application do
               multicast_addr: "255.255.255.255",
               broadcast_only: true
             ]
+          ]
+        ]
+
+      :dns ->
+        [
+          dns: [
+            strategy: Cluster.Strategy.DNSPoll,
+            config: [polling_interval: 5_000, query: "app", node_basename: "myapp"]
           ]
         ]
     end

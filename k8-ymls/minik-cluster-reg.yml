@@ -1,0 +1,12 @@
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: minikube
+registry: mini-registry
+kubernetesVersion: v1.23.3
+minCPUs: 3
+---
+apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+name: mini-registry
+port: 5001
+listenAddress: 127.0.0.1
