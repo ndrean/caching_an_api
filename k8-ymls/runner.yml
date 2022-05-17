@@ -34,7 +34,10 @@ spec:
           #     protocol: TCP
           env:
             - name: ERLANG_COOKIE
-              value: "release_secret"
+              valueFrom:
+                secretKeyRef:
+                  name: erl-cookie
+                  key: ERLANG_COOKIE
             - name: NAMESPACE
               valueFrom:
                 fieldRef:
@@ -43,9 +46,3 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          # command: ["bash"]
-          # args:
-          #   - "-c"
-          #   - iex --cookie $(echo $ERLANG_COOKIE) --name $(echo k8_cluster@$(echo $POD_IP)) -S mix
-
-          # iex --cookie $(echo $ERLANG_COOKIE) --name $(echo k8_cluster@$(echo $POD_IP)) -S mix

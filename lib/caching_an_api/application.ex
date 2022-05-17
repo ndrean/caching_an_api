@@ -8,22 +8,6 @@ defmodule CachingAnApi.Application do
   def start(_type, _args) do
     import Supervisor.Spec, warn: false
 
-    topologies = [
-      # libcluster will perform a DNS query against a headless Kubernetes Service, getting the IP address of all Pods running our Erlang cluster:
-      k8: [
-        strategy: Cluster.Strategy.Kubernetes,
-        config: [
-          mode: :ip,
-          kubernetes_namespace: "stage",
-          polling_interval: 10_000,
-          kubernetes_selector: "app=myapp",
-          kubernetes_node_basename: "myapp",
-          kubernetes_ip_lookup_mode: :pods
-        ]
-      ]
-    ]
-
-    # topologies = Application.get_env(:libcluster, :topologies) || []
     opts = [strategy: :one_for_one, name: CachingAnApi.Supervisor]
 
     cache_opt = [
@@ -33,51 +17,66 @@ defmodule CachingAnApi.Application do
       disc_copy: Application.get_env(:caching_an_api, :disc_copy) || nil
     ]
 
-    cluster_type =
-      Application.get_env(:libcluster, :topologies)[:local_epmd][:strategy] ||
-        Application.get_env(:libcluster, :topologies)[:gossip_ex][:strategy] ||
-        Application.get_env(:libcluster, :topologies)[:k8][:strategy]
-
+    ####### set me! #########
+    cluster_type = :k8_cluster
     Logger.notice("Config: #{inspect(cache_opt ++ [cluster_type: cluster_type])}")
-
-    # Node.set_cookie(node(), :release_secret)
     Logger.debug("#{inspect(node())}, #{inspect(Node.get_cookie())}")
-    # start Ets with a table name
+
+    ### Init Ets #######
     EtsDb.init(cache_opt)
-    # MnDb2.connect_mnesia_to_cluster(cache_opt[:mn_table])
 
     # list to be supervised
     [
       # start libcluster
-      {Cluster.Supervisor, [topologies, [name: CachingAnApi.ClusterSupervisor]]},
-
-      # start Mnesia GenServer
-      # {MnDb.Supervisor, cache_opt}
-
+      {Cluster.Supervisor, [topology(cluster_type), [name: CachingAnApi.ClusterSupervisor]]},
       # start Cache GS
       {CacheGS.Supervisor, cache_opt}
-      # {CacheA, cache_opt ++ [state: %{}]} <- testing the Agent point of view
     ]
     |> Supervisor.start_link(opts)
   end
 
-  # defp set_cluster_cookie() do
-  #   require IEx
+  @doc """
+  `libcluster` will perform a DNS query against a headless Kubernetes Service, getting the IP address of all Pods running our Erlang cluster:
+  """
+  def topology(key) do
+    case key do
+      :k8_cluster ->
+        [
+          k8: [
+            strategy: Cluster.Strategy.Kubernetes,
+            config: [
+              mode: :ip,
+              kubernetes_ip_lookup_mode: :pods,
+              polling_interval: 10_000,
+              kubernetes_selector: "app=myapp",
+              kubernetes_node_basename: "myapp",
+              kubernetes_namespace: Application.get_env(:caching_an_api, :namespace)
+            ]
+          ]
+        ]
 
-  #   cookie_to_atom = fn cookie ->
-  #     if is_atom(cookie), do: cookie, else: String.to_atom(cookie)
-  #   end
+      :gossip_cluster ->
+        [
+          gossip_ex: [
+            strategy: Elixir.Cluster.Strategy.Gossip,
+            config: [
+              port: 45892,
+              if_addr: "0.0.0.0",
+              multicast_addr: "255.255.255.255",
+              broadcast_only: true
+            ]
+          ]
+        ]
+    end
+  end
 
-  #   cookie =
-  #     (System.get_env("ERLANG_COOKIE") ||
-  #        CachingAnApi.MixProject.project()
-  #        |> get_in([:releases, :myapp, :cookie]))
-  #     |> cookie_to_atom.()
-
-  #   # IEx.pry()
-
-  #   ("myapp" <> "@" <> System.get_env("POD_IP"))
-  #   |> String.to_atom()
-  #   |> Node.set_cookie(cookie)
+  # only with Mix!
+  # def release_name() do
+  #   CachingAnApi.MixProject.project()[:releases]
+  #   |> Keyword.keys()
+  #   |> List.first()
+  #   |> Atom.to_string()
   # end
+
+  # defp check_ip, do: System.cmd("hostname", ["-s"]) |> elem(0) |> String.trim()
 end

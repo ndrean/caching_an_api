@@ -309,7 +309,21 @@ enum_yield_many                  1.63 K - 1.76x slower +264.55 μs
 asynced_stream                   1.02 K - 2.82x slower +633.34 μs
 yield_many_asynced_stream        1.00 K - 2.87x slower +651.90 μs
 
-## Misc notes
+## Kubernetes notes
+
+> Scaling deployments:
+
+```bash
+kubectl scale deploy myapp --replicas=3
+```
+
+> Attach to a running pod (here, a release that runs with `start_iex`):
+
+```bash
+kubectl attach myapp-89b6ddf5-kjmw4 -i
+iex(myapp@10.42.0.116)2>
+```
+
 
 ## Actor model vs Object-Orientated
 

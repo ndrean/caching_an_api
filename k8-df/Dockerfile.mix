@@ -20,4 +20,3 @@ RUN mix deps.get --only $MIX_ENV && mix deps.compile
 COPY lib ./lib
 RUN mix compile
 CMD ["bash"]
-#  -c iex --cookie ${ERLANG_COOKIE} --name $caching@${POD_IP} -S mix"]

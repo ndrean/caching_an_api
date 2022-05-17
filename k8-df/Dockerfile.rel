@@ -1,4 +1,4 @@
-# Build Stage using a pre-build release launcher
+# Build Stage using a pre-build release
 FROM  bitwalker/alpine-elixir:latest AS build
 
 RUN elixir -v
@@ -19,7 +19,7 @@ COPY mix.exs mix.lock ./
 COPY config config
 
 # Run dependencies && Create a release with quiet to skip writing progress
-RUN mix do deps.get --only $MIX_ENV
+RUN mix do deps.get --only $MIX_ENV && mix deps.compile
 COPY lib ./lib
 COPY rel ./rel
 RUN mix release ${REL_NAME} --quiet
@@ -28,9 +28,7 @@ RUN mix release ${REL_NAME} --quiet
 RUN adduser -h /opt/app -D app \
    && chown -R app: _build/
 
-
-
-# Final Stage
+################################@@ Final Stage
 FROM alpine:latest AS app
 
 # Accept MIX_ENV as build arg
@@ -54,14 +52,10 @@ WORKDIR /opt/app
 # Copy release dir from build stage
 COPY --from=build /opt/release/_build/${MIX_ENV}/rel/${REL_NAME} ./
 
-# ENV RELEASE_DISTRIBUTION=name
-# ENV RELEASE_NAME=myapp
-# ENV RELEASE_NODE="${RELEASE_NAME}@${REL_POD_IP}"
-# ENV RELEASE_COOKIE=release_secret
 
 # COPY entrypoint.sh /entrypoint.sh
 # ENTRYPOINT ["./sbin/tini", "--"] 
 # , "/entrypoint.sh"
 
 # Start your app
-CMD ["./bin/myapp", "start"]
+CMD ["./bin/myapp", "start_iex"]

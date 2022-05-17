@@ -1,6 +1,0 @@
-# Build Stage using a pre-build release launcher
-FROM  ctlptl-minikube-registry:base AS build
-
-WORKDIR /app
-COPY lib ./lib
-CMD ["bash"]

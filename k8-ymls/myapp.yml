@@ -5,7 +5,7 @@ metadata:
   namespace: stage
 
 spec:
-  replicas: 2
+  replicas: 4
   selector:
     matchLabels:
       app: myapp
@@ -30,11 +30,17 @@ spec:
 
           tty: true
           stdin: true
-          # ports:
-          #   - containerPort: <Port>
+
+          # envFrom:
+          #   - secretRef:
+          #     name: erl_cookie
+
           env:
-            - name: ERLANG_COOKIE
-              value: "release_secret"
+            - name: RELEASE_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: erl-cookie
+                  key: ERLANG_COOKIE
             - name: NAMESPACE
               valueFrom:
                 fieldRef:
