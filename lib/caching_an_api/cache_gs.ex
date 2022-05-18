@@ -61,7 +61,7 @@ defmodule CacheGS do
 
   @impl true
   def handle_call({:inverse, index, key}, _from, state) do
-    reply = if state[:store] == :mn, do: MnDb2.inverse(index, key, state[:mn_table])
+    reply = if state[:store] == :mn, do: Mndb.inverse(index, key, state[:mn_table])
 
     {:reply, reply, state}
   end
@@ -71,7 +71,7 @@ defmodule CacheGS do
     cache =
       case state[:store] do
         :mn ->
-          MnDb2.read(key, state[:mn_table])
+          Mndb.read(key, state[:mn_table])
 
         :ets ->
           EtsDb.get(key, state[:ets_table])
@@ -95,7 +95,7 @@ defmodule CacheGS do
           state
 
         :mn ->
-          MnDb2.write(key, data, state[:mn_table])
+          Mndb.write(key, data, state[:mn_table])
           state
 
         :dcrt ->
@@ -113,8 +113,8 @@ defmodule CacheGS do
   """
   @impl true
   def handle_info({:nodeup, _node}, state) do
-    Logger.debug("#{inspect(node())} is UP!")
-    MnDb2.connect_mnesia_to_cluster(state[:mn_table], state[:disc_copy])
+    # Logger.debug("#{inspect(node())} is UP!")
+    Mndb.connect_mnesia_to_cluster(state[:mn_table], state[:disc_copy])
     {:noreply, state}
   end
 
@@ -138,7 +138,7 @@ defmodule CacheGS do
 
   @impl true
   def handle_info({:quit, {:shutdown, :network}}, state) do
-    System.cmd("say", ["bye to #{node() |> to_string() |> String.at(0)}"])
+    # System.cmd("say", ["bye to #{node() |> to_string() |> String.at(0)}"])
     {:stop, state}
   end
 

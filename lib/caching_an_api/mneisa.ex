@@ -1,4 +1,4 @@
-defmodule MnDb2 do
+defmodule Mndb do
   alias :mnesia, as: Mnesia
   require Logger
 
@@ -42,7 +42,7 @@ defmodule MnDb2 do
            [{^m_table, ^index, data}] = Mnesia.read({m_table, index})
            Mnesia.write({m_table, index, Map.put(data, key, true)})
          end) do
-      {:atomic, :ok} -> MnDb2.read(index, m_table)
+      {:atomic, :ok} -> Mndb.read(index, m_table)
       {:aborted, reason} -> {:aborted, reason}
     end
   end
@@ -66,7 +66,6 @@ defmodule MnDb2 do
   """
 
   def connect_mnesia_to_cluster(name, disc_copy? \\ false) do
-    Logger.info("Starting...")
     # IEx.pry()
 
     with {:start, :ok} <- {:start, ensure_start()},
@@ -74,8 +73,9 @@ defmodule MnDb2 do
          {:disc_schema, :ok} <-
            {:disc_schema, ensure_schema_from_ram_to_disc_copy(disc_copy?)},
          {:create_table, :ok} <- {:create_table, ensure_table_create(name, disc_copy?)},
-         {:ensure_table, :ok} <-
+         {:ensure_table, {:ok, :set}} <-
            {:ensure_table, set_table_type_at_node(name, disc_copy?)} do
+      Logger.debug("Mnesia :ok at #{node()}")
       :ok
     else
       {:start, {:error, reason}} -> {:error, :start, reason}
@@ -167,7 +167,6 @@ defmodule MnDb2 do
         :ok
 
       {:aborted, {:already_exists, _name}} ->
-        # Logger.info("Table #{name} already present at #{node()}")
         :ok
 
       {:aborted, reason} ->
@@ -185,13 +184,13 @@ defmodule MnDb2 do
     with :ok <- wait_for(name) do
       case Mnesia.add_table_copy(name, node(), type) do
         {:atomic, :ok} ->
-          :ok
+          {:ok, :set}
 
         {:aborted, {:already_exists, _name, _node}} ->
-          :ok
+          {:ok, :set}
 
         {:error, {:already_exists, _table, _node, _}} ->
-          :ok
+          {:ok, :set}
 
         {:aborted, reason} ->
           Logger.debug("set type at node: #{inspect(reason)}")
@@ -213,7 +212,7 @@ defmodule MnDb2 do
 
       {:timeout, _name} ->
         Logger.debug("loop wait #{name}")
-        Process.sleep(500)
+        Process.sleep(1_000)
         wait_for(name)
     end
   end

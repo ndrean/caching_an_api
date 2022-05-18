@@ -1,15 +1,14 @@
 import Config
 
 config :mnesia,
-  dir: 'mndb_#{Node.self()}',
-  # cookie: "release_secret",
-  env: config_env()
+  dir: 'mndb_#{Node.self()}'
 
 config :logger, :console, format: "[$date $time] $message\n", colors: [enabled: true]
 
 config :caching_an_api,
-  # :gossip_cluster or :k8_cluster
-  cluster_type: :k8_cluster,
+  # env: config_env(),
+  # :gossip or :k8
+  cluster_type: :dns,
   # namespace: "stage",
   # :mn or :ets or nil
   store: :mn,

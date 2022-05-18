@@ -1,0 +1,85 @@
+# https://www.mendrugory.com/post/remote-elixir-node-kubernetes/
+# https://david-delassus.medium.com/elixir-and-kubernetes-a-love-story-721cc6a5c7d5
+# Kubernetes Headless Service, which provides a internal DNS that returns the IP’s of all Pods currently deployed
+# ---
+# kind: Service
+# apiVersion: v1
+# metadata:
+#   name: myapp-svc-headless
+#   namespace: stage
+#   labels:
+#     app: myapp
+# spec:
+#   selector:
+#     app: myapp
+#   type: ClusterIP
+#   clusterIP: None
+#   ports:
+#     - port: 4369
+#       targetPort: empd
+#       name: epmd
+#       protocol: TCP
+
+# <- inside the cluster, the service is exposed at "port" <=> "containerPort" in pods
+# <- it will forward req to pods with -l a::myapp to "targetport"
+
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: myapp
+  namespace: stage
+  labels:
+    app: myapp
+spec:
+  replicas: 2
+  # strategy:
+  #   type: RollingUpdate
+  #   rollingUpdate:
+  #     maxSurge: 34%
+  #     maxUnavailable: 0%
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      namespace: stage
+      labels:
+        app: myapp
+    spec:
+      # serviceAccountName: discoverer
+      containers:
+        - name: myapp
+          image: rel-cluster
+          imagePullPolicy: IfNotPresent
+
+          resources:
+            limits:
+              memory: "300Mi"
+              cpu: "300m"
+          tty: true
+          stdin: true
+
+          env:
+            - name: RELEASE_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: erl-cookie
+                  key: ERLANG_COOKIE
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SERVICE_NAME
+              value: myapp-svc-headless
+            - name: APP_NAME
+              value: theapp
+
+          ports:
+            - containerPort: 4369 # <-> "port" in the headless Service
+              name: epmd # <-> "targetPort" in the headless Service
+              protocol: TCP

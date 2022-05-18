@@ -1,5 +1,8 @@
 {
-   "yaml.schemas": {
-      "kubernetes://schema/v1@service+apps/v1@deployment": "file:///Users/utilisateur/Exercism/elixir/caching_an_api/dep_headless.yml"
-   }
+  "yaml.schemas": {
+    "kubernetes://schema/v1@service+apps/v1@deployment": [
+      "file:///Users/utilisateur/Exercism/elixir/caching_an_api/dep_headless.yml",
+      "file:///Users/utilisateur/Exercism/elixir/caching_an_api/k8-ymls/myapp-headless.yml"
+    ]
+  }
 }

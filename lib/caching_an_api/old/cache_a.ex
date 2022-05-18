@@ -67,12 +67,12 @@
 #   """
 
 #   # def handle_info({:nodeup, _node}, state) do
-#   #   # MnDb2.update_mnesia_nodes()
+#   #   # Mndb.update_mnesia_nodes()
 #   #   {:noreply, state}
 #   # end
 
 #   # def handle_info({:nodedown, _node}, state) do
-#   #   # MnDb2.update_mnesia_nodes()
+#   #   # Mndb.update_mnesia_nodes()
 #   #   {:noreply, state}
 #   # end
 # end

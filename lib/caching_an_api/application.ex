@@ -12,15 +12,15 @@ defmodule CachingAnApi.Application do
 
     ####### change config in runtime.exs (store, libcluster) #########
     app_opt = [
-      store: Application.get_env(:caching_an_api, :store) || nil,
-      mn_table: Application.get_env(:caching_an_api, :mn_table) || :mcache,
-      ets_table: Application.get_env(:caching_an_api, :ets_table) || :ecache,
-      disc_copy: Application.get_env(:caching_an_api, :disc_copy) || false,
-      cluster_type: Application.get_env(:caching_an_api, :cluster_type) || :gossip_cluster
+      store: Application.fetch_env!(:caching_an_api, :store),
+      mn_table: Application.fetch_env!(:caching_an_api, :mn_table) || :mcache,
+      ets_table: Application.fetch_env!(:caching_an_api, :ets_table) || :ecache,
+      disc_copy: Application.fetch_env!(:caching_an_api, :disc_copy) || false,
+      cluster_type: Application.fetch_env!(:caching_an_api, :cluster_type) || :gossip_cluster
     ]
 
-    Logger.notice("Config: #{inspect(app_opt)}")
-    Logger.debug("#{inspect(node())}, #{inspect(Node.get_cookie())}")
+    # Logger.notice("Config: #{inspect(app_opt)}")
+    # Logger.debug("#{inspect(node())}, #{inspect(Node.get_cookie())}")
 
     ### Init Ets #######
     EtsDb.init(app_opt)
@@ -37,27 +37,30 @@ defmodule CachingAnApi.Application do
   end
 
   @doc """
-  `libcluster` will perform a DNS query against a headless Kubernetes Service, getting the IP address of all Pods running our Erlang cluster:
+  The library `libcluster` will perform a DNS query against a headless Kubernetes Service, getting the IP address of all Pods running our Erlang cluster.
+  - Strategy.Kubernetes.DNS: This clustering strategy works by loading all your Erlang nodes (within Pods) in the current Kubernetes namespace. It will fetch the addresses of all pods under a shared headless service and attempt to connect. It will continually monitor and update its connections every 5s.
+  - Strategy.Kubernetes, lookup mode: pods: your pod must be running as a service account with the ability to list pods. For mode: :ip, it uses `app_name@ip`. That is: it uses the IP address directly, e.g. myapp@10.42.1.49.
+
   """
   def topology(key) do
     case key do
-      :k8_cluster ->
+      # your pod must be running as a "service account" with the ability to list pods.
+      :k8 ->
         [
           k8: [
-            strategy: Cluster.Strategy.Kubernetes,
+            strategy: Elixir.Cluster.Strategy.Kubernetes,
             config: [
               mode: :ip,
               kubernetes_ip_lookup_mode: :pods,
               polling_interval: 10_000,
-              kubernetes_selector: "app=myapp",
-              kubernetes_node_basename: "myapp",
-              kubernetes_namespace: System.get_env("NAMESPACE")
-              # kubernetes_namespace: Application.get_env(:caching_an_api, :namespace)
+              kubernetes_selector: "app=#{System.fetch_env!("APP_NAME")}",
+              kubernetes_node_basename: System.fetch_env!("SERVICE_NAME"),
+              kubernetes_namespace: System.fetch_env!("NAMESPACE")
             ]
           ]
         ]
 
-      :gossip_cluster ->
+      :gossip ->
         [
           gossip_ex: [
             strategy: Elixir.Cluster.Strategy.Gossip,
@@ -73,8 +76,16 @@ defmodule CachingAnApi.Application do
       :dns ->
         [
           dns: [
-            strategy: Cluster.Strategy.DNSPoll,
-            config: [polling_interval: 5_000, query: "app", node_basename: "myapp"]
+            strategy: Elixir.Cluster.Strategy.Kubernetes.DNS,
+            config: [
+              # "myapp-svc-headless",
+              service: System.fetch_env!("SERVICE_NAME"),
+              # "stage",
+              kubernetes_namespace: System.fetch_env!("NAMESPACE"),
+              polling_interval: 5_000,
+              # "myapp"
+              application_name: System.fetch_env!("APP_NAME")
+            ]
           ]
         ]
     end

@@ -20,13 +20,13 @@ spec:
       serviceAccountName: discoverer
       containers:
         - name: myapp
-          image: rel-cluster
-          imagePullPolicy: "Always"
+          image: mix-cluster
+          imagePullPolicy: IfNotPresent
 
           resources:
             limits:
-              memory: "256Mi"
-              cpu: "300m"
+              memory: "500Mi"
+              cpu: "500m"
 
           tty: true
           stdin: true
@@ -49,3 +49,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+            - name: SERVICE_NAME
+              value: myapp-svc-headless
+            - name: APP_NAME
+              value: myapp
+          ports:
+            - containerPort: 4369 # <=> "port" in service
+              name: epmd
+              protocol: TCP

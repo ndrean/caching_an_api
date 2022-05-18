@@ -34,7 +34,7 @@
 #            Mnesia.write({name, index, Map.put(data, key, true)})
 #          end) do
 #       {:atomic, :ok} ->
-#         MnDb2.read(index, name)
+#         Mndb.read(index, name)
 
 #       {:aborted, reason} ->
 #         {:aborted, reason}
@@ -143,7 +143,7 @@
 #   #              Mnesia.write({m_table, index, Map.put(data, key, true)})
 #   #            end) do
 #   #         {:atomic, :ok} ->
-#   #           {:ok, %{response: MnDb2.read(index, m_table)}}
+#   #           {:ok, %{response: Mndb.read(index, m_table)}}
 
 #   #         {:aborted, reason} ->
 #   #           {:aborted, reason}

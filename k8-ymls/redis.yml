@@ -1,0 +1,63 @@
+#redis-dep.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-svc
+spec:
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: client
+  selector:
+    app: redis
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-dep
+  labels:
+    app: redis # match spec.template.labels
+spec:
+  serviceName: redis
+  selector:
+    matchLabels:
+      app: redis
+  replicas: 1
+  template:
+    metadata:
+      name: redis-pod
+      labels:
+        app: redis # # match spec.selector.matchLabels
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 6379
+          command: ["redis-server"]
+          resources:
+            requests:
+              cpu: 100m
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 3
+          # volumeMounts:
+          #   - name: data
+          #     mountPath: "/data"
+          #     readOnly: false
+  # volumeClaimTemplates:
+  #   - metadata:
+  #       name: data
+  #     spec:
+  #       accessModes: ["ReadWriteOnce"]
+  #       #storageClassName: "standard"
+  #       resources:
+  #         requests:
+  #           storage: 100Mi

@@ -326,8 +326,44 @@ or
 
 ```bash
 kubectl exec -it runner--89b6ddf5-kjmw4 -- sh
-bash# iex --cookie "$(echo $ERLANG_COOKIE)" --name "$(echo myapp@$(echo $POD_IP))" -S mix
+bash# iex --cookie "$(echo $ERLANG_COOKIE)" --name "$(echo $APP_NAME)@$(echo $POD_IP))" -S mix
 iex(myapp@10.42.0.116)2>
+```
+
+```bash
+> kubectl exec -it myapp-d59cc7b8f-hhwpc -- sh
+
+bash$ nslookup myapp-svc-headless.stage.svc.cluster.local
+
+Server:  10.96.0.10
+Address: 10.96.0.10:53
+Name: myapp-svc-headless.stage.svc.cluster.local
+Address: 10.244.0.54
+Name: myapp-svc-headless.stage.svc.cluster.local
+Address: 10.244.0.53 
+````
+
+> Create cluster with local registry
+
+```bash
+> ctlptl apply -f k3d-cluster-reg.yml
+> ctlptl delete registry k3d-reg
+> ctlptl delete -f k3d-cluster-reg.yml
+```
+
+> Use namespace
+
+Do not forget to create and assing a namespace to the project:
+
+```bash
+kubectl create ns stage
+kubens stage
+```
+
+> Cleaning local images in the local registry:
+
+```bash
+docker rmi $(docker images |grep 'localhost*')
 ```
 
 ## Actor model vs Object-Orientated

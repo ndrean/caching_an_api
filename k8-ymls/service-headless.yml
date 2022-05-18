@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: myapp-svc-headless
+  namespace: stage
+  labels:
+    app: myapp
+spec:
+  selector:
+    app: myapp
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 4369
+      targetPort: empd
+      name: epmd
+      protocol: TCP

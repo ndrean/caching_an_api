@@ -1,11 +1,11 @@
 # Build Stage using a pre-build release
 FROM  bitwalker/alpine-elixir:latest AS build
 
-RUN elixir -v
+# RUN elixir -v
 
 # Accept MIX_ENV as build arg
 ARG MIX_ENV=${MIX_ENV:-dev}
-ARG REL_NAME=${REL_NAME:-myapp}
+ARG BUILD_NAME=myapp
 # ENV HEX_MIRROR=https://repo.hex.pm
 
 
@@ -22,7 +22,7 @@ COPY config config
 RUN mix do deps.get --only $MIX_ENV && mix deps.compile
 COPY lib ./lib
 COPY rel ./rel
-RUN mix release ${REL_NAME} --quiet
+RUN mix release $BUILD_REL_NAME --quiet
 
 # Create a non-root user && Transfer ownership to app user
 RUN adduser -h /opt/app -D app \
@@ -33,7 +33,8 @@ FROM alpine:latest AS app
 
 # Accept MIX_ENV as build arg
 ARG MIX_ENV=${MIX_ENV:-dev}
-ARG REL_NAME=${REL_NAME:-myapp}
+ENV BUILD_NAME=myapp
+
 
 # Install system dependencies required for your app at runtime
 RUN apk --update --no-cache add bash openssl ncurses-libs tini libstdc++ libgcc
@@ -47,10 +48,13 @@ USER app
 # Set current working directory to app dir
 WORKDIR /opt/app
 
-
+ENV RELEASE_DISTRIBUTION=name
+ENV NODE_IP=127.0.0.1 
+# <- will be overridden 
+ENV RELEASE_NODE=${BUILD_NAME}@${POD_IP}
 
 # Copy release dir from build stage
-COPY --from=build /opt/release/_build/${MIX_ENV}/rel/${REL_NAME} ./
+COPY --from=build /opt/release/_build/${MIX_ENV}/rel/${BUILD_NAME} ./
 
 
 # COPY entrypoint.sh /entrypoint.sh
@@ -58,4 +62,6 @@ COPY --from=build /opt/release/_build/${MIX_ENV}/rel/${REL_NAME} ./
 # , "/entrypoint.sh"
 
 # Start your app
+# ENTRYPOINT ["opt/${MIX_ENV}/rel/ease/bin/${BUILD_NAME}"]
+
 CMD ["./bin/myapp", "start_iex"]

@@ -1,39 +1,45 @@
+# https://www.mendrugory.com/post/remote-elixir-node-kubernetes/
+# https://david-delassus.medium.com/elixir-and-kubernetes-a-love-story-721cc6a5c7d5
+# Kubernetes Headless Service, which provides a internal DNS that returns the IP’s of all Pods currently deployed
+
 kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: runner
   namespace: stage
-
+  labels:
+    app: myapp
 spec:
   replicas: 1
+  # strategy:
+  #   type: RollingUpdate
+  #   rollingUpdate:
+  #     maxSurge: 34%
+  #     maxUnavailable: 0%
   selector:
     matchLabels:
       app: myapp
-
   template:
     metadata:
       namespace: stage
       labels:
         app: myapp
-
     spec:
-      serviceAccountName: discoverer
+      # serviceAccountName: discoverer
       containers:
         - name: runner
           image: mix-cluster
           imagePullPolicy: IfNotPresent
+
           resources:
             limits:
-              memory: "256Mi"
-              cpu: "300m"
+              memory: "500Mi"
+              cpu: "500m"
           tty: true
           stdin: true
-          # ports:
-          #   - name: epmd
-          #     containerPort: 4369
-          #     protocol: TCP
+
           env:
-            - name: ERLANG_COOKIE
+            - name: RELEASE_COOKIE
               valueFrom:
                 secretKeyRef:
                   name: erl-cookie
@@ -49,7 +55,7 @@ spec:
             - name: SERVICE_NAME
               value: myapp-svc-headless
             - name: APP_NAME
-              value: myapp
+              value: theapp
 
           ports:
             - containerPort: 4369 # <=> "port" in service
