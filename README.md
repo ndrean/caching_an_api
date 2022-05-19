@@ -309,6 +309,8 @@ yield_many_asynced_stream        1.00 K - 2.87x slower +651.90 μs
 
 ## Kubernetes notes
 
+> Watch:
+`kubectl get events --watch`
 > Scaling deployments:
 
 ```bash
@@ -366,6 +368,110 @@ kubens stage
 docker rmi $(docker images |grep 'localhost*')
 ```
 
+## k8 DNS
+
+In a Kubernetes cluster, service acts as a Service Discovery mechanism. When deploying a service, a DNS name is assigned to it. These DNS names can be used to communicate with the services and the upstream backing pods.
+
+Kubernetes DNS service named as kube-dns, which has a static IP. This address of name-server is stored under /etc/resolv.conf on each pod and generally it should pickup from host /etc/resolv.conf. DNS naming rules resolve pod and service DNS to their corresponding cluster IPs. Kubernetes DNS support forward lookup (A records), port lookup (SRV records) and some other options.
+
+When deploying regular service resource K8s allocates IP address (cluster Ip) for it. This is being used as an the single entry point for pods backed by the service,which enables it to act as a proxy for upstream pods. And also regular services are assigned a DNS A record which resolves to the cluster IP of the service. And also DNS SRV Records are created for named ports of the service which resolves to the port number and the domain name.
+
+In case of headless service K8s does not allocate any IP address for it. Headless services are also assigned a DNS A record which resolves to a set of IPs corresponds to back-end pods managed by the service, which allows interact directly with the pods instead of proxy. And also when deploying of headless service, K8s will still create the DNS A records for individual upstream pods which enables to resolve headless service domain name to IP addresses of connected pods. Additionally DNS SRV records are also created for headless services, which resolves to set of upstream pod FQDNs (i.e. domain name of the pod of the form `<pod name>.<service name>.<namespace>.<cluster base DNS>`).
+
+In regular deployments, pod names will be randomly generated and pod FQDNs are derived from its IP address and service name. I.e. `A-B-C-D.<service name>.<namespace>.<cluster base DNS>` where A-B-C-D is the IP address with ‘.’ converted to ‘-’.
+
+Pod FQDN in headless services DNS SRV records are also in this pod FQDN form for each deployment type. Therefore host.domain part of the Erlang node name required to be in this form (i.e. pod FQDN) as DNS SRV query for front-ended headless-service is used to discover upstream pods.
+
+### Get `observer` working remotely
+
+Set up the `Observer` for remotely connecting to the mix release deployed Elixir app.
+
+For Docker, [follow this](https://github.com/chazsconi/connect-remote-elixir-docker)
+
+From a terminal, do:
+
+1. In `MixProjects`, set:
+
+```elixir
+defp releases do
+  [
+    myapp: [
+      include_executables_for: [:unix],
+      applications: [
+        caching_an_api: :permanent,
+        runtime_tools: :permanent
+      ]
+    ]
+  ]
+  end
+```
+
+2. Run `mix.release` (or rerun `tilt up` to compile the release dockerfile).
+
+To launch remotely the observer, do:
+
+- Run with a batch file
+
+  ```bash
+  ./erl-observer.sh -l app=myapp -c release_secret
+  ```
+
+- Manual
+
+1. Get the PORT:
+
+```bash
+kubectl exec -it myapp-6dd7f6b998-r8kwp -- sh -c "./erts-12.2.1/bin/epmd -names | tail -n 1"
+~$ name theapp at port 39391
+```
+
+2. In one terminal, set PORT and run the port-forward:
+
+```bash
+PORT=39391
+
+kubectl port-forward  <choose-the-pod: myapp-6dd7f6b998-r8kwp> 4369 39391
+#or
+ssh -N -L PORT:localhost:PORT -L 4369:localhost:4369 -i ~/.minikube/machines/minikube/id_rsa docker@$(minikube ip)
+```
+
+3. In another terminal, run the following to get the `observer` running.
+
+```bash
+> erl -name myapp@127.0.0.1 -run observer
+Erlang/OTP 24 [erts-12.3.2] ... [dtrace]
+Eshell V12.3.2  (abort with ^G)
+(myapp@127.0.0.1)1>
+```
+
+### Checking
+
+In another terminal, attach to a pod:
+
+```bash
+kubectl attach -i 
+iex(theapp@10.244.0.15)1> Api.Stream_synced(1..10)
+[...]
+iex(theapp@10.244.0.15)2> :rpc.call(:"theapp@10.244.0.16", Mndb, :data, [])
+[...]
+```
+
+In another terminal, change the number of running pods:
+
+```bash
+kubectl scale deploy myapp --replicas=6
+```
+
+Check that the data is transfered and Mnesia is running on all pods.
+
+```bash
+iex(theapp@10.244.0.15)3> :rpc.call(:"theapp@10.244.0.20", Mndb, :data, [])
+[...]
+
+iex(theapp@10.244.0.15)4> :mnesia.system_info(:running_db_nodes)
+[:"theapp@10.244.0.15", :...,:"theapp@10.244.0.22"]
+```
+
 ## Actor model vs Object-Orientated
 
 **Objects** enscapsulate state and interact with **functions**. **Encapsulation** dictates that the internal data of an object is not accessible directly from the outside; it can only be modified by invoking a set of curated methods. The object is responsible for exposing safe operations that protect the invariant nature of its encapsulated data. Since functions are executed with threads, and since encapsulation only guarantee for single-threaded access, you need to add mechanisms such as **locks**.
@@ -376,6 +482,7 @@ Instead of calling methods like objects do, actors *receive* and *send* messages
 An important difference between passing messages and calling methods is that messages have no return value. By sending a message, an actor delegates work to another actor.
 **Actors** react to messages just like **objects** react to methods invoked on them.
 
+
 ### Elixir notes
 
 [handle_continue](https://elixirschool.com/blog/til-genserver-handle-continue/)
@@ -384,19 +491,17 @@ An important difference between passing messages and calling methods is that mes
 
 [Handling events](https://mkaszubowski.com/2021/01/09/elixir-event-handling.html)
 
-### Production release
+#### Production release
 
 Take a look at [Render](https://render.com/docs/deploy-elixir-cluster) and [Gigalixir](https://gigalixir.com/#/about) and [fly.io](https://fly.io/docs/getting-started/elixir/)
 
-```bash
-mix phx.gen.secret
-xxxx
-export SCRET_KEY_BASE="xxxx"
-MIX_ENV=prod mix setup
-MIX_ENV=prod mix release
-```
+#### Bakeware
 
-### Enum vs Stream
+<https://www.youtube.com/watch?v=ML5hQjPQL7A>
+
+<https://github.com/bake-bake-bake/bakeware>
+
+#### Enum vs Stream
 
 `Stream` evaluates the functions of the chain for each enumerable, whereas `Enum` evaluates each enumerable then performs the next function of the chain.
 
@@ -407,8 +512,119 @@ iex>  [1,2,3]|> Enum.map(&IO.inspect/1) |> Enum.map(&IO.inspect/1)
 1,2,3,1,2,3
 ```
 
-### Bakeware
+### Erlang without EPMD
 
-<https://www.youtube.com/watch?v=ML5hQjPQL7A>
+[Application Github](https://github.com/tsloughter/epmdless)
 
-<https://github.com/bake-bake-bake/bakeware>
+[Source 1](https://medium.com/hackernoon/running-distributed-erlang-elixir-applications-on-docker-b211d95affbe)
+
+[source](https://www.erlang-solutions.com/blog/erlang-and-elixir-distribution-without-epmd/)
+
+```elixir
+# A module containing the function that determines the port number based on a node name
+
+defmodule Epmdless do
+  def dist_port(name) when is_atom(name) do
+    dist_port Atom.to_string name
+  end
+
+  def dist_port(name) when is_list(name) do
+    dist_port List.to_string name
+  end
+
+  def dist_port(name) when is_binary(name) do
+    # Figure out the base port.  If not specified using the `inet_dist_base_port` kernel environment variable, default to 4370, one above the epmd port.
+    base_port = :application.get_env :kernel, :inet_dist_base_port, 4370
+
+    # Now, figure out our "offset" on top of the base port. The offset is the integer just to the left of the @ sign in our node name. If there is no such number, the offset is 0. Also handle the case when no hostname was specified.
+    node_name = Regex.replace ~r/@.*$/, name, ""
+    offset =
+      case Regex.run ~r/[0-9]+$/, node_name do
+    nil -&gt;
+      0
+    [offset_as_string] -&gt;
+      String.to_integer offset_as_string
+      end
+
+    base_port + offset
+  end
+end
+
+defmodule Epmdless_dist do
+
+  def listen(name) do
+    # Here we figure out what port we want to listen on.
+
+    port = Epmdless.dist_port name
+
+    # Set both "min" and "max" variables, to force the port number to this one.
+    :ok = :application.set_env :kernel, :inet_dist_listen_min, port
+    :ok = :application.set_env :kernel, :inet_dist_listen_max, port
+
+    # Finally run the real function!
+    :inet_tcp_dist.listen name
+  end
+
+  def select(node) do
+    :inet_tcp_dist.select node
+  end
+
+  def accept(listen) do
+    :inet_tcp_dist.accept listen
+  end
+
+  def accept_connection(accept_pid, socket, my_node, allowed, setup_time) do
+    :inet_tcp_dist.accept_connection accept_pid, socket, my_node, allowed, setup_time
+  end
+
+  def setup(node, type, my_node, long_or_short_names, setup_time) do
+    :inet_tcp_dist.setup node, type, my_node, long_or_short_names, setup_time
+  end
+
+  def close(listen) do
+    :inet_tcp_dist.close listen
+  end
+
+  def childspecs do
+    :inet_tcp_dist.childspecs
+  end
+end
+
+defmodule Epmdless_epmd_client do
+# erl_distribution wants us to start a worker process.  We don't need one though
+
+  def start_link do
+    :ignore
+  end
+
+# As of Erlang/OTP 19.1, register_node/3 is used instead of register_node/2, passing along the address family, `inet_tcp` or `inet6_tcp`.  This makes no difference for our purposes
+
+  def register_node(name, port, _family) do
+    register_node(name, port)
+  end
+
+  def register_node(_name,_port) do
+    # This is where we would connect to epmd and tell it which port we're listening on, but since we're epmd-less, we don't do that.
+
+    # Need to return a "creation" number between 1 and 3.
+    creation = :rand.uniform 3
+    {:ok, creation}
+  end
+
+  def port_please(name, _ip) do
+    port = Epmdless.dist_port name
+    # The distribution protocol version number has been 5 ever since Erlang/OTP R6.
+    version = 5
+    {:port, port, version}
+  end
+
+  def names(_hostname) do
+    # Since we don't have epmd, we don't really know what other nodes there are.
+    {:error, :address}
+  end
+end
+```
+
+```bash
+iex --erl "-proto_dist Elixir.Epmdless -start_epmd false -epmd_module Elixir.Epmdless_epmd_client" --sname foo3
+```

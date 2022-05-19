@@ -22,7 +22,7 @@ COPY config config
 RUN mix do deps.get --only $MIX_ENV && mix deps.compile
 COPY lib ./lib
 COPY rel ./rel
-RUN mix release $BUILD_REL_NAME --quiet
+RUN mix release $BUILD_NAME --quiet
 
 # Create a non-root user && Transfer ownership to app user
 RUN adduser -h /opt/app -D app \
@@ -64,4 +64,4 @@ COPY --from=build /opt/release/_build/${MIX_ENV}/rel/${BUILD_NAME} ./
 # Start your app
 # ENTRYPOINT ["opt/${MIX_ENV}/rel/ease/bin/${BUILD_NAME}"]
 
-CMD ["./bin/myapp", "start_iex"]
+CMD ["sh", "-c", "./bin/${BUILD_NAME} start_iex"]

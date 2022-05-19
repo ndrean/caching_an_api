@@ -16,6 +16,7 @@ defmodule CachingAnApi.MixProject do
 
   def application do
     [
+      include_executables_for: [:unix],
       extra_applications: [:logger, :mnesia],
       mod: {CachingAnApi.Application, []}
       # included_applications: [:mnesia]
@@ -37,9 +38,9 @@ defmodule CachingAnApi.MixProject do
   defp releases do
     [
       myapp: [
-        include_erts: true,
+        # include_erts: true,
         include_executables_for: [:unix],
-        applications: [caching_an_api: :permanent]
+        applications: [caching_an_api: :permanent, runtime_tools: :permanent]
         # cookie: "my_secret"
       ]
     ]

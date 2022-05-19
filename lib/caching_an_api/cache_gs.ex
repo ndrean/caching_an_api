@@ -139,11 +139,13 @@ defmodule CacheGS do
   @impl true
   def handle_info({:quit, {:shutdown, :network}}, state) do
     # System.cmd("say", ["bye to #{node() |> to_string() |> String.at(0)}"])
+    :mnesia.stop()
     {:stop, state}
   end
 
   @impl true
   def terminate(_, _state) do
+    :mnesia.stop()
     Logger.warn("GS stopped")
   end
 end
