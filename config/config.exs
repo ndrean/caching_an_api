@@ -7,14 +7,14 @@ config :logger, :console, format: "[$date $time] $message\n", colors: [enabled: 
 
 config :caching_an_api,
   # env: config_env(),
-  # :gossip or :k8
-  cluster_type: :dns,
+  # :gossip or :k8 or :dns
+  cluster_type: :k8,
   # namespace: "stage",
   # :mn or :ets or nil
   store: :mn,
   mn_table: :mcache,
   ets_table: :ecache,
   # true or false
-  disc_copy: true
+  disc_copy: false
 
 import_config "#{Mix.env()}.exs"

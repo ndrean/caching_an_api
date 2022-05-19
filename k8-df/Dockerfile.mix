@@ -5,22 +5,12 @@ ENV MIX_ENV=${MIX_ENV:-dev}
 # ENV HEX_MIRROR=https://repo.hex.pm
 
 RUN apk --update --no-cache add bash curl
-
 WORKDIR /app
-
 # Hex package manager && rebar (Erlang build tool)
-RUN mix local.hex --force --if-missing && mix local.rebar --force --if-missing
-
-# see .dockerignore list for non-copied files
-
+RUN mix local.hex --force  && mix local.rebar
 COPY mix.exs mix.lock ./
-COPY config config
+COPY config/ ./config
 RUN mix deps.get --only $MIX_ENV && mix deps.compile
-
-COPY lib ./lib
-# COPY / ./
+COPY lib/ ./lib
 RUN mix compile
-
-
-# ENTRYPOINT ["./entrypoint.sh"]
 CMD ["sh"]

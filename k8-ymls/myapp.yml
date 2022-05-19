@@ -5,7 +5,7 @@ metadata:
   namespace: stage
 
 spec:
-  replicas: 4
+  replicas: 2
   selector:
     matchLabels:
       app: myapp
@@ -20,13 +20,13 @@ spec:
       serviceAccountName: discoverer
       containers:
         - name: myapp
-          image: mix-cluster
-          imagePullPolicy: IfNotPresent
+          image: rel-cluster
+          imagePullPolicy: Always
 
           resources:
             limits:
-              memory: "500Mi"
-              cpu: "500m"
+              memory: "300Mi"
+              cpu: "300m"
 
           tty: true
           stdin: true
@@ -53,7 +53,7 @@ spec:
               value: myapp-svc-headless
             - name: APP_NAME
               value: myapp
-          ports:
-            - containerPort: 4369 # <=> "port" in service
-              name: epmd
-              protocol: TCP
+          # ports:
+          #   - containerPort: 4369 # <=> "port" in service
+          #     name: epmd
+          #     protocol: TCP
