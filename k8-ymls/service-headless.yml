@@ -12,6 +12,6 @@ spec:
   clusterIP: None
   ports:
     - port: 4369
-      targetPort: empd
+      targetPort: epmd
       name: epmd
       protocol: TCP

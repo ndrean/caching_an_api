@@ -16,10 +16,11 @@ defmodule CachingAnApi.MixProject do
 
   def application do
     [
+      include_erts: true,
       include_executables_for: [:unix],
-      extra_applications: [:logger, :mnesia],
+      extra_applications: [:logger],
+      included_applications: [:mnesia],
       mod: {CachingAnApi.Application, []}
-      # included_applications: [:mnesia]
     ]
   end
 
@@ -30,6 +31,7 @@ defmodule CachingAnApi.MixProject do
       {:benchee, "~> 1.1"},
       {:jason, "~> 1.3"},
       {:libcluster, "~> 3.3"}
+      # {:observer_cli, "~> 1.7"}
       # {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       # {:ex_doc, "~> 0.21", only: :dev, runtime: false}
     ]
@@ -38,9 +40,13 @@ defmodule CachingAnApi.MixProject do
   defp releases do
     [
       myapp: [
-        # include_erts: true,
+        include_erts: true,
         include_executables_for: [:unix],
-        applications: [caching_an_api: :permanent, runtime_tools: :permanent]
+        applications: [
+          caching_an_api: :permanent,
+          runtime_tools: :permanent
+          # observer_cli: :permanent
+        ]
         # cookie: "my_secret"
       ]
     ]

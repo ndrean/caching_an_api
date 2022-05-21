@@ -12,7 +12,7 @@ defmodule EtsDb do
     :ok
   end
 
-  def get(key, name) do
+  def read(key, name) do
     case :ets.lookup(name, key) do
       [] -> nil
       [{^key, data}] -> data
@@ -20,7 +20,7 @@ defmodule EtsDb do
     end
   end
 
-  def put(key, data, name) do
+  def write(key, data, name) do
     :ets.insert(name, {key, data})
     :ok
   end

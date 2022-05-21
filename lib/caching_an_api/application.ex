@@ -8,9 +8,7 @@ defmodule CachingAnApi.Application do
   def start(_type, _args) do
     import Supervisor.Spec, warn: false
 
-    opts = [strategy: :one_for_one, name: CachingAnApi.Supervisor]
-
-    ####### change config in runtime.exs (store, libcluster) #########
+    ####### get config in config.exs (store, libcluster) #########
     app_opt = [
       store: Application.fetch_env!(:caching_an_api, :store),
       mn_table: Application.fetch_env!(:caching_an_api, :mn_table) || :mcache,
@@ -19,21 +17,18 @@ defmodule CachingAnApi.Application do
       cluster_type: Application.fetch_env!(:caching_an_api, :cluster_type) || :gossip_cluster
     ]
 
-    # Logger.notice("Config: #{inspect(app_opt)}")
-    # Logger.debug("#{inspect(node())}, #{inspect(Node.get_cookie())}")
-
-    ### Init Ets #######
+    ### Init db #######
     EtsDb.init(app_opt)
 
-    # list to be supervised
     [
-      # start libcluster
       {Cluster.Supervisor,
        [topology(app_opt[:cluster_type]), [name: CachingAnApi.ClusterSupervisor]]},
-      # start Cache GS
-      {CacheGS.Supervisor, app_opt}
+      {Mndb.Supervisor, app_opt}
     ]
-    |> Supervisor.start_link(opts)
+    |> Supervisor.start_link(
+      strategy: :one_for_one,
+      name: CachingAnApi.Supervisor
+    )
   end
 
   @doc """
@@ -52,7 +47,7 @@ defmodule CachingAnApi.Application do
             config: [
               mode: :ip,
               kubernetes_ip_lookup_mode: :pods,
-              polling_interval: 10_000,
+              polling_interval: 5_000,
               kubernetes_selector: "app=#{System.fetch_env!("APP_NAME")}",
               kubernetes_node_basename: System.fetch_env!("SERVICE_NAME"),
               kubernetes_namespace: System.fetch_env!("NAMESPACE")

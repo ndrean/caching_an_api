@@ -26,19 +26,19 @@ EtsDb in just a module that wraps Ets, and Mnesia is/or not a supervised GenServ
 ## The stores
 
 - [ETS](https://www.erlang.org/doc/man/ets.html)
-It is an in-build in-memory key-value data store localized in a node and it's life shelf is dependant upon the process that created it. In this case, the app: when we kill all the nodes, this data is lost, which is a wanted feature here.
-This data store is **not distributed**: other nodes within a cluster can't access to it.
-Data is saved with tuples and there is no need to serialize values.
-Since we launch Ets in it's own process, we used the flag `:public`. Any process can thus read and write from the Ets database. The operations have to be made atomic to avoid race conditions (for example, no write and then read within the same function as this could lead to inconsistancies). It then offers shared, concurrent read access to data (meaning scaling upon the number of CPUs used).
+  It is an in-build in-memory key-value data store localized in a node and it's life shelf is dependant upon the process that created it. In this case, the app: when we kill all the nodes, this data is lost, which is a wanted feature here.
+  This data store is **not distributed**: other nodes within a cluster can't access to it.
+  Data is saved with tuples and there is no need to serialize values.
+  Since we launch Ets in it's own process, we used the flag `:public`. Any process can thus read and write from the Ets database. The operations have to be made atomic to avoid race conditions (for example, no write and then read within the same function as this could lead to inconsistancies). It then offers shared, concurrent read access to data (meaning scaling upon the number of CPUs used).
 
-A word about [performance between GenServer and Ets](<https://prying.io/technical/2019/09/01/caching-options-in-an-elixir-application.html>).
+A word about [performance between GenServer and Ets](https://prying.io/technical/2019/09/01/caching-options-in-an-elixir-application.html).
 
 > Check for the improved [ConCache](https://github.com/sasa1977/con_cache) with TTL support.
 
 - [Mnesia](http://erlang.org/documentation/doc-5.2/pdf/mnesia-4.1.pdf)
-Mnesia is an in-build distributed in-memory and optionnally  disc persisted database build (node-based) for concurrency. It works both in memory (**with Ets**) and on disc. As Ets, it stores tuples.
-You can define tables whose structure is defined by a record type.
-In Mnesia, actions are wrapped within a **transaction**: if something goes wrong with executing a transaction, it will be rolled back and nothing will be saved on the database. This means the operations are `:atomic`,  meaning that all operations should occur or no operations should occur in case of an error. The disc persistance is optional in Mnesia. Set `disc_copy: :disc_copy` or to `nil` in the "config.exs".
+  Mnesia is an in-build distributed in-memory and optionnally disc persisted database build (node-based) for concurrency. It works both in memory (**with Ets**) and on disc. As Ets, it stores tuples.
+  You can define tables whose structure is defined by a record type.
+  In Mnesia, actions are wrapped within a **transaction**: if something goes wrong with executing a transaction, it will be rolled back and nothing will be saved on the database. This means the operations are `:atomic`, meaning that all operations should occur or no operations should occur in case of an error. The disc persistance is optional in Mnesia. Set `disc_copy: :disc_copy` or to `nil` in the "config.exs".
 
   - storage capacity: from the [doc](https://www.erlang.org/faq/mnesia.html), it is indicated that:
     - for ram_copies and disc_copies, the entire table is kept in memory, so data size is limited by available RAM.
@@ -46,9 +46,6 @@ In Mnesia, actions are wrapped within a **transaction**: if something goes wrong
 
 > What's the point of using Mnesia? If you need to keep a database that will be used by multiple processes and/or nodes, using Mnesia means you don't have to write your own access controls.
 > Furthermore, a [word about scalability performance of Mnesia](http://www.dcs.gla.ac.uk/~amirg/publications/DE-Bench.pdf) and [here](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang) and [here](https://stackoverflow.com/questions/5044574/how-scalable-is-distributed-erlang).
-
-- [CRDT](https://github.com/derekkraan/delta_crdt_ex)
-DeltaCrdt implements a key/value store using concepts from Delta CRDTs. A CRDT can be used as a distributed temporary caching mechanism that is synced across our Cluster. A good introduction to [CRDT](https://moosecode.nl/blog/how_deltacrdt_can_help_write_distributed_elixir_applications).
 
 ## The Erlang cluster
 
@@ -59,7 +56,7 @@ To create a cluster, from an **IEX** session, you need to pass a name to connect
 
 ### Launch the nodes
 
-- [name] Use the flag `--sname` (for short name, within the *same* network) and it will assign **:"a@your-local-system-name"**. If you are not running in the same network, use instead the flag `--name` with a qualified domain, such as **:"a@127.0.0.1"** or **:"a@example.com"**.
+- [name] Use the flag `--sname` (for short name, within the _same_ network) and it will assign **:"a@your-local-system-name"**. If you are not running in the same network, use instead the flag `--name` with a qualified domain, such as **:"a@127.0.0.1"** or **:"a@example.com"**.
 
 ```elixir
 # term 1
@@ -106,7 +103,7 @@ end
 
 ### Connect the nodes
 
-- [connect] Thanks to the **transitivty** of the BEAM connections,  you just need to connect one node to the N-1 others to get the full P2P network of N(N-1)/2 TPC connections.
+- [connect] Thanks to the **transitivty** of the BEAM connections, you just need to connect one node to the N-1 others to get the full P2P network of N(N-1)/2 TPC connections.
 
 #### Manual connection
 
@@ -118,9 +115,9 @@ iex(A@127.0.0.1)> for l <- ["A","B","C"], do: String.to_atom(l<> "@127.0.0.1") |
 
 # check with:
 iex(A@127.0.0.1)> :net.ping(:"C@127.0.0.1")
-:pong 
+:pong
 iex(B@127.0.0.1)> :net.ping(:"D@127.0.0.1")
-:pong 
+:pong
 ```
 
 With **code**, if you want to connect two machines "a@node" and "b@node" with respective IP of 192.168.0.1 and 192.168.0.2, then you would do:
@@ -264,13 +261,13 @@ We use the Mnesia system event handler by declaring `:mnesia.subscribe(:system)`
 
 > DONT add `:mnesia` in the MixProject application `:extra_applications` since you will need to start it manually. Instead, add `included_applications: [:mnesia]`. This will also remove the warnings in VSCode. The reason is that you need to firstly create the schema (meaning you create the database), and only then start Mnesia.
 
-The sequence is:  `:mnesia.create_schema` to create a new database, then  `:mnesia.start()`, then `:mnesia.create_table` where you specify the rows and also that you want a disc copy for your node. The parameter `disc_copies: [node()]` means that data is stored both on disc and in the memory. Finally, the disc copy directory can be specified in the `config.exs` file.
+The sequence is: `:mnesia.create_schema` to create a new database, then `:mnesia.start()`, then `:mnesia.create_table` where you specify the rows and also that you want a disc copy for your node. The parameter `disc_copies: [node()]` means that data is stored both on disc and in the memory. Finally, the disc copy directory can be specified in the `config.exs` file.
 
 ### Distributed Mnesia startup
 
 The sequence is:
 
-- start Mnesia. Two options: declare `[extra_applications: [:mnesia]` in MixProject  or use `:mnesia.start()`.
+- start Mnesia. Two options: declare `[extra_applications: [:mnesia]` in MixProject or use `:mnesia.start()`.
 - connect nodes and inform Mnesia that other nodes belong to the cluster,
 - ensure that data (schema and table) are stored on disc. Two copy functions are used, depending if it's the schema or table.
 
@@ -302,15 +299,20 @@ Used `benchee` to run `mix run lib/caching_an_api/benchmark.exs`.
 - Cached. The cache is populated with the first pass of the slowest, `yield_many_asynced_stream`).
 
 Comparison:
-stream_synced                    2.88 K
-enum_yield_many                  1.63 K - 1.76x slower +264.55 μs
-asynced_stream                   1.02 K - 2.82x slower +633.34 μs
-yield_many_asynced_stream        1.00 K - 2.87x slower +651.90 μs
+stream_synced 2.88 K
+enum_yield_many 1.63 K - 1.76x slower +264.55 μs
+asynced_stream 1.02 K - 2.82x slower +633.34 μs
+yield_many_asynced_stream 1.00 K - 2.87x slower +651.90 μs
 
 ## Kubernetes notes
 
 > Watch:
-`kubectl get events --watch`
+
+```bash
+> `kubectl get events --watch`
+> `kubectl get pods -o wide -- watch``
+```
+
 > Scaling deployments:
 
 ```bash
@@ -342,8 +344,8 @@ Address: 10.96.0.10:53
 Name: myapp-svc-headless.stage.svc.cluster.local
 Address: 10.244.0.54
 Name: myapp-svc-headless.stage.svc.cluster.local
-Address: 10.244.0.53 
-````
+Address: 10.244.0.53
+```
 
 > Create cluster with local registry
 
@@ -370,9 +372,36 @@ docker rmi $(docker images |grep 'localhost*')
 
 ## k8 DNS
 
+Ingress or LoadBalancer provided by the cloud plateform.
+
+k8 will assign IP address to pods. Since pods can get destroyed and created, and can even run on different machines, we create a **service** to expose these pods to the k8 cluster. The service reaches for pods that match a given **selector**: we set a selector label in the pods, and the same selector label in the service. For example, name a service `metadata.name: svc-myapp`, add the selector label in `metadata.labels.app: myapp`, assign a `port`in `specs.ports.port: 3001` or it's name `specs.ports.name: epmd`. Then any pod within the cluster can access pods labeled `app: myapp` through this service at `http://svc-myapp.<namespace>:3001`. This service will act as a **load-balancer** to the matched pods. This creates endpoints for the service based on the label for DNS resolution. The `targetPort` is the target port of the containers in the pods, the `port` is where the service can be reached within the cluster, and the `nodeport` is where the service can be reached from outside.
+Since asing a `nodePort` to an internal ClusterIP to publically reach this service (outside of the cluster) has significant downsides for production use, we put in front of the ClusterIP a service of type **loadbalancer** or **ingress**.
+
+-**loadbalancer**. We specifiy there the `nodePort: 30150`. is specified. -**ingress**. This needs an implementation of an **Ingress controler** which processes the rules written in the **Ingress** service. The controller can be for example **Nginx Ingress Controller** or other solutions in [cloud environment](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/).
+
+> Kubernetes does not offer an implementation of network load balancers (Services of type LoadBalancer) for bare-metal clusters, so you can check [bare-metal](https://kubernetes.github.io/ingress-nginx/deploy/baremetal/), and also [metallb](https://metallb.universe.tf/).
+
+The service `Ingress` describes the redirecting `rules`. If we want to reach "https://domain/shops", then we have a rule with `rules.host: domain`and `rules.http.paths: /shops` and we specify the link to the internal ClusterIP that should serve the request: we set `rules.http.paths.backend.serviceName: my-app-svc` (the ClusterIP name) and `rules.http.paths.backend.servicePort: 3000`, which is this ClusterIP `port`.
+
+while the LoadBalancer service will only routing.
+
+`kube-proxy` will manage the **iptables** from the Linux kernel of the machines.
+In front of
+
+Since IP address can change, instead use DNS which resolves a name to an IP address. `kube-dns` manages this.
+
+- update DNS records,
+- point the DNS to the load-balancer
+
 In a Kubernetes cluster, service acts as a Service Discovery mechanism. When deploying a service, a DNS name is assigned to it. These DNS names can be used to communicate with the services and the upstream backing pods.
 
 Kubernetes DNS service named as kube-dns, which has a static IP. This address of name-server is stored under /etc/resolv.conf on each pod and generally it should pickup from host /etc/resolv.conf. DNS naming rules resolve pod and service DNS to their corresponding cluster IPs. Kubernetes DNS support forward lookup (A records), port lookup (SRV records) and some other options.
+
+Pods deployed through deployments use a **service** to communicate with other pods. Indeed, the IP address of pods will changed constantly upon destruction and creation. The service will provide a fixed accessible IP address and proxies the deployed pods by **load-balacing**. The service will be of type **ClusterIP**, the default type. You set the `targetPort`(in the Service `spec.ports.targetPort`) to be the `containerPort`(in the Deployment `spec.template.spec.containers.ports.containerPort`).
+There are use cases where you want to reach for a specific pod. For example, pods deployed as StatefulSet, where each pod have a unique fixed name. Databases are deployed as StatefulSet with a master and workers. Another example of interest are distributed nodes of a BEAM cluster. To create the clsuter, BEAM needs to know each individual full name.
+If a client needs to figure out IP addresses, it can whether call k8 API server to get all the addresses and names, or wether use the DNS lookup. A DNS lookup for a service returns the `ClusterIP` address. Since the service acts as a **load-balancer**, it will randomly commnunicate with one of the pods linked to this service. When `ClusterIP` is set to `none`, then the DNS lookup will return the PodIP instead. A service set with `clusterIP: none` is called a **headless** service
+
+Pods can be reached by external traffic (from the cluster) when we assign a NodePort to the service. We set a fixed address (range from 30000 to 32767).
 
 When deploying regular service resource K8s allocates IP address (cluster Ip) for it. This is being used as an the single entry point for pods backed by the service,which enables it to act as a proxy for upstream pods. And also regular services are assigned a DNS A record which resolves to the cluster IP of the service. And also DNS SRV Records are created for named ports of the service which resolves to the port number and the domain name.
 
@@ -385,6 +414,9 @@ Pod FQDN in headless services DNS SRV records are also in this pod FQDN form for
 ### Get `observer` working remotely
 
 Set up the `Observer` for remotely connecting to the mix release deployed Elixir app.
+
+- get local IP
+  REMOTE=192.168.1.32 ( ifconfig en0 | grep 'inet ' | cut -d ' ' -f 2)
 
 For Docker, [follow this](https://github.com/chazsconi/connect-remote-elixir-docker)
 
@@ -421,7 +453,7 @@ To launch remotely the observer, do:
 1. Get the PORT:
 
 ```bash
-kubectl exec -it myapp-6dd7f6b998-r8kwp -- sh -c "./erts-12.2.1/bin/epmd -names | tail -n 1"
+kubectl exec -it myapp-6dd7f6b998-r8kwp -- sh -c "./erts-12.2.1/bin/epmd -names | tail -n 1 | sed 's/[^0-9]//g' "
 ~$ name theapp at port 39391
 ```
 
@@ -449,7 +481,7 @@ Eshell V12.3.2  (abort with ^G)
 In another terminal, attach to a pod:
 
 ```bash
-kubectl attach -i 
+kubectl attach -i
 iex(theapp@10.244.0.15)1> Api.Stream_synced(1..10)
 [...]
 iex(theapp@10.244.0.15)2> :rpc.call(:"theapp@10.244.0.16", Mndb, :data, [])
@@ -477,11 +509,10 @@ iex(theapp@10.244.0.15)4> :mnesia.system_info(:running_db_nodes)
 **Objects** enscapsulate state and interact with **functions**. **Encapsulation** dictates that the internal data of an object is not accessible directly from the outside; it can only be modified by invoking a set of curated methods. The object is responsible for exposing safe operations that protect the invariant nature of its encapsulated data. Since functions are executed with threads, and since encapsulation only guarantee for single-threaded access, you need to add mechanisms such as **locks**.
 
 **Actors** interact with **message** passing. They have their own state, the **behavior**, a function that defines how to react to messages.
-Instead of calling methods like objects do, actors *receive* and *send* messages to each other. Sending a message does not transfer the thread of execution from the sender to the destination. An actor can send a message and continue without blocking. Message-passing in actor systems is fundamentally **asynchronous**, i.e. message transmission and reception do not have to happen at the same time, and senders may transmit messages before receivers are ready to accept them. Messages go into actor  **mailboxes**. Actors execute independently from the senders of a message, and they react to incoming messages sequentially, one at a time. While each actor processes messages sent to it sequentially, different actors work concurrently with each other so that an actor system can process as many messages simultaneously as the hardware will support.
+Instead of calling methods like objects do, actors _receive_ and _send_ messages to each other. Sending a message does not transfer the thread of execution from the sender to the destination. An actor can send a message and continue without blocking. Message-passing in actor systems is fundamentally **asynchronous**, i.e. message transmission and reception do not have to happen at the same time, and senders may transmit messages before receivers are ready to accept them. Messages go into actor **mailboxes**. Actors execute independently from the senders of a message, and they react to incoming messages sequentially, one at a time. While each actor processes messages sent to it sequentially, different actors work concurrently with each other so that an actor system can process as many messages simultaneously as the hardware will support.
 
 An important difference between passing messages and calling methods is that messages have no return value. By sending a message, an actor delegates work to another actor.
 **Actors** react to messages just like **objects** react to methods invoked on them.
-
 
 ### Elixir notes
 
@@ -500,6 +531,10 @@ Take a look at [Render](https://render.com/docs/deploy-elixir-cluster) and [Giga
 <https://www.youtube.com/watch?v=ML5hQjPQL7A>
 
 <https://github.com/bake-bake-bake/bakeware>
+
+#### VPN tunnel
+
+[Wireguard](https://www.wireguard.com/#conceptual-overview)
 
 #### Enum vs Stream
 

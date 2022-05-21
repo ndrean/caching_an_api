@@ -1,4 +1,4 @@
-# defmodule MnDb do
+# defmodule MnDb2 do
 #   alias :mnesia, as: Mnesia
 #   use GenServer
 #   require Logger
@@ -43,19 +43,7 @@
 
 #   ### Test functions
 #   def nodes(), do: GenServer.call(__MODULE__, {:nodes})
-#   def data(), do: GenServer.call(__MODULE__, {:data})
-#   def info(), do: :mnesia.system_info()
-
-#   ### GenServer init client
-
-#   @doc """
-#   This function is called by the supervisor and trigger the `MnDb.init` callback
-#   """
-#   def start_link(opts \\ [store: :mn, mn_table: :mcache]) do
-#     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-#   end
-
-#   ###
+#   def data(), do: def(info(), do: :mnesia.system_info())
 
 #   @doc """
 #   A flag is added to trigger the GenServer that runs the `terminate` callback when going down.
@@ -74,36 +62,6 @@
 #     # if opts[:store] == :mn, do: m_name, else: opts[:ets_table]
 #     {:ok, state}
 #   end
-
-#   #### TEST functions for rpc via GenServer.call
-
-#   @doc """
-#   TEST functions for rpc via GenServer.call
-#   It can be executed from a remote node against another one.
-
-#   ```elixir
-#   GenServer.call({MnDb, :"b@127.0.0.1"}, {:node_list})
-#   for node <- Node.list(), do: {node, GenServer.call({MnDb, node}, {:node_list}) }
-
-#     ```
-#   """
-#   @impl true
-#   def handle_call({:nodes}, _from, state) do
-#     reply = Node.list()
-#     {:reply, reply, state}
-#   end
-
-#   @impl true
-#   def handle_call({:data}, _from, state) do
-#     reply =
-#       if state[:store] == :ets,
-#         do: :ets.tab2list(state[:ets_table]),
-#         else: :ets.tab2list(state[:mn_table])
-
-#     {:reply, reply, state}
-#   end
-
-#   #### END TEST functions
 
 #   # @impl true
 #   # def handle_call({:read, key, m_table}, _from, state) do

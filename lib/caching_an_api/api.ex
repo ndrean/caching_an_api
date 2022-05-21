@@ -3,37 +3,18 @@ defmodule Api do
 
   @url "https://jsonplaceholder.typicode.com/todos/"
 
-  @opts %{
-    store: Application.get_env(:caching_an_api, :store),
-    mn_table: Application.get_env(:caching_an_api, :mn_table),
-    ets_table: Application.get_env(:caching_an_api, :ets_table)
-  }
-
-  # Api.stream_synced(1..2)
+  # @opts %{
+  #   store: Application.get_env(:caching_an_api, :store),
+  #   mn_table: Application.get_env(:caching_an_api, :mn_table),
+  #   ets_table: Application.get_env(:caching_an_api, :ets_table)
+  # }
 
   def fetch(i, f) do
-    data = CacheGS.get(i)
+    data = Cache.read(i)
 
     case(data) do
-      nil ->
-        f.(i)
-
-      %{"was_cached" => b1, "completed" => b2} ->
-        case @opts.store do
-          :mn ->
-            if !b1 && !b2 do
-              data = CacheGS.inverse(i, "completed")
-              fetch_or_update_cache(data["was_cached"], i, data)
-            else
-              fetch_or_update_cache(data["was_cached"], i, data)
-            end
-
-          :ets ->
-            fetch_or_update_cache(data["was_cached"], i, data)
-
-          nil ->
-            fetch_or_update_cache(data["was_cached"], i, data)
-        end
+      nil -> f.(i)
+      %{"was_cached" => bool} -> fetch_or_update_cache(bool, i, data)
     end
   end
 
@@ -44,7 +25,7 @@ defmodule Api do
 
       false ->
         new_data = Map.put(data, "was_cached", true)
-        CacheGS.put(i, new_data)
+        Cache.write(i, new_data)
         {:ok, {i, %{response: new_data}}}
     end
   end
@@ -94,7 +75,7 @@ defmodule Api do
           |> Poison.decode!()
           |> Map.put("was_cached", false)
 
-        CacheGS.put(i, body)
+        Cache.write(i, body)
         {:ok, {i, %{response: body}}}
 
       {:ok, {:error, %HTTPoison.Error{reason: reason}}} ->
@@ -112,7 +93,7 @@ defmodule Api do
           |> Poison.decode!()
           |> Map.put("was_cached", false)
 
-        CacheGS.put(i, body)
+        Cache.write(i, body)
         {i, %{response: body}}
 
       {:error, %HTTPoison.Error{reason: reason}} ->

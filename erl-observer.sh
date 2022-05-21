@@ -47,6 +47,7 @@ if [ ! $ERL_COOKIE ]; then
   ERL_COOKIE=${EPMD_OUTPUT[1]}
 fi
 
+echo " Cookie: '${ERL_COOKIE}'"
 # By default, user is debug
 if [ ! $ERL_USER ]; then
   ERL_USER="debug"
@@ -66,5 +67,6 @@ echo "kubectl port-forward ${POD_NAME} ${K8S_NAMESPACE} 4369 ${OTP_PORT}"
 kubectl port-forward $POD_NAME $K8S_NAMESPACE 4369 $OTP_PORT &> /dev/null &
 sleep 1
 
+iex --erl "-proto_dist inet6_tcp" --sname ${ERL_USER} --cookie ${ERL_COOKIE} -e "IO.inspect(Node.connect(:'${ERL_USER}@10.244.0.196'), label: \"Node Connected?\"); IO.inspect(Node.list(), label: \"Connected Nodes\"); :observer.start"
 # Run observer in hidden mode to don't heart clusters health
-erl -name $ERL_USER@127.0.0.1 -setcookie $ERL_COOKIE -hidden -run observer
+# erl -name $ERL_USER@127.0.0.1 -setcookie $ERL_COOKIE -hidden -run observer

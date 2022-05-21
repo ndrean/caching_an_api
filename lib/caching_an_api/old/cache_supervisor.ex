@@ -1,7 +1,5 @@
-# defmodule MnDb.Supervisor do
-#   use Supervisor
-
-#   # https://github.com/beardedeagle/mnesiac/blob/master/lib/mnesiac/supervisor.ex
+# defmodule CacheGS.Supervisor do
+#   use Supervisor, restart: :transient
 
 #   def start_link(init_args) do
 #     Supervisor.start_link(__MODULE__, init_args, name: __MODULE__)
@@ -10,7 +8,7 @@
 #   @impl true
 #   def init(init_args) do
 #     [
-#       {MnDb, init_args}
+#       {CacheGS, init_args}
 #     ]
 #     |> Supervisor.init(strategy: :one_for_one)
 #   end

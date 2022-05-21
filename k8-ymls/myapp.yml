@@ -20,7 +20,7 @@ spec:
       serviceAccountName: discoverer
       containers:
         - name: myapp
-          image: mix-cluster
+          image: rel-myapp
           imagePullPolicy: IfNotPresent
 
           resources:
@@ -53,6 +53,9 @@ spec:
               value: myapp-svc-headless
             - name: APP_NAME
               value: myapp
+          command:
+            - "start_iex"
+
           ports:
             - containerPort: 4369 # <=> "port" in service
               name: epmd
