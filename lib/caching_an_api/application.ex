@@ -13,7 +13,8 @@ defmodule CachingAnApi.Application do
       store: Application.fetch_env!(:caching_an_api, :store),
       mn_table: Application.fetch_env!(:caching_an_api, :mn_table) || :mcache,
       ets_table: Application.fetch_env!(:caching_an_api, :ets_table) || :ecache,
-      disc_copy: Application.fetch_env!(:caching_an_api, :disc_copy) || false,
+      # Application.fetch_env!(:caching_an_api, :disc_copy) || false,
+      disc_copy: false,
       cluster_type: Application.fetch_env!(:caching_an_api, :cluster_type) || :gossip_cluster
     ]
 

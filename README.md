@@ -306,6 +306,12 @@ yield_many_asynced_stream 1.00 K - 2.87x slower +651.90 μs
 
 ## Kubernetes notes
 
+### Kind dashboard
+
+[Reed this](https://medium.com/@munza/local-kubernetes-with-kind-helm-dashboard-41152e4b3b3d)
+
+### Commands
+  
 > Watch:
 
 ```bash

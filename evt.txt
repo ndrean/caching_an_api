@@ -1,0 +1,65 @@
+NAME                     READY   STATUS    RESTARTS   AGE   IP             NODE                 NOMINATED NODE   READINESS GATES
+myapp-794449dc99-bdvw9   1/1     Running   0          59s   10.244.0.243   kind-control-plane   <none>           <none>
+myapp-794449dc99-gdxv4   1/1     Running   0          59s   10.244.0.244   kind-control-plane   <none>           <none>
+myapp-794449dc99-gdxv4   1/1     Terminating   0          2m33s   10.244.0.244   kind-control-plane   <none>           <none>
+myapp-794449dc99-bdvw9   1/1     Terminating   0          2m34s   10.244.0.243   kind-control-plane   <none>           <none>
+myapp-794449dc99-gdxv4   0/1     Terminating   0          2m40s   10.244.0.244   kind-control-plane   <none>           <none>
+myapp-794449dc99-gdxv4   0/1     Terminating   0          2m40s   10.244.0.244   kind-control-plane   <none>           <none>
+myapp-794449dc99-gdxv4   0/1     Terminating   0          2m40s   10.244.0.244   kind-control-plane   <none>           <none>
+myapp-794449dc99-bdvw9   0/1     Terminating   0          2m41s   10.244.0.243   kind-control-plane   <none>           <none>
+myapp-794449dc99-bdvw9   0/1     Terminating   0          2m41s   10.244.0.243   kind-control-plane   <none>           <none>
+myapp-794449dc99-bdvw9   0/1     Terminating   0          2m41s   10.244.0.243   kind-control-plane   <none>           <none>
+myapp-794449dc99-dlw2p   0/1     Pending       0          0s      <none>         <none>               <none>           <none>
+myapp-794449dc99-9qw5f   0/1     Pending       0          0s      <none>         <none>               <none>           <none>
+myapp-794449dc99-dlw2p   0/1     Pending       0          0s      <none>         kind-control-plane   <none>           <none>
+myapp-794449dc99-9qw5f   0/1     Pending       0          0s      <none>         kind-control-plane   <none>           <none>
+myapp-794449dc99-dlw2p   0/1     ContainerCreating   0          0s      <none>         kind-control-plane   <none>           <none>
+myapp-794449dc99-9qw5f   0/1     ContainerCreating   0          0s      <none>         kind-control-plane   <none>           <none>
+myapp-794449dc99-dlw2p   1/1     Running             0          3s      10.244.0.245   kind-control-plane   <none>           <none>
+myapp-794449dc99-9qw5f   1/1     Running             0          3s      10.244.0.246   kind-control-plane   <none>           <none>
+myapp-794449dc99-9qw5f   1/1     Terminating         0          2m54s   10.244.0.246   kind-control-plane   <none>           <none>
+myapp-794449dc99-dlw2p   1/1     Terminating         0          2m54s   10.244.0.245   kind-control-plane   <none>           <none>
+myapp-794449dc99-9qw5f   0/1     Terminating         0          3m2s    <none>         kind-control-plane   <none>           <none>
+myapp-794449dc99-9qw5f   0/1     Terminating         0          3m2s    <none>         kind-control-plane   <none>           <none>
+myapp-794449dc99-9qw5f   0/1     Terminating         0          3m2s    <none>         kind-control-plane   <none>           <none>
+myapp-794449dc99-dlw2p   0/1     Terminating         0          3m2s    <none>         kind-control-plane   <none>           <none>
+myapp-794449dc99-dlw2p   0/1     Terminating         0          3m2s    <none>         kind-control-plane   <none>           <none>
+myapp-794449dc99-dlw2p   0/1     Terminating         0          3m2s    <none>         kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   0/1     Pending             0          0s      <none>         <none>               <none>           <none>
+myapp-7b7fcff77d-mtxkj   0/1     Pending             0          0s      <none>         <none>               <none>           <none>
+myapp-7b7fcff77d-svhb2   0/1     Pending             0          0s      <none>         kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   0/1     Pending             0          0s      <none>         kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   0/1     ContainerCreating   0          0s      <none>         kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   0/1     ContainerCreating   0          0s      <none>         kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   1/1     Running             0          3s      10.244.0.248   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   1/1     Running             0          3s      10.244.0.247   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   0/1     Completed           0          2m21s   10.244.0.247   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   1/1     Running             1 (1s ago)   2m22s   10.244.0.247   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   0/1     Completed           0            3m39s   10.244.0.248   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   1/1     Running             1 (2s ago)   3m40s   10.244.0.248   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   0/1     Completed           1 (2m15s ago)   4m36s   10.244.0.247   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   0/1     CrashLoopBackOff    1 (14s ago)     4m49s   10.244.0.247   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   1/1     Running             2 (14s ago)     4m49s   10.244.0.247   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   0/1     Completed           1 (2m22s ago)   6m      10.244.0.248   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   0/1     CrashLoopBackOff    1 (14s ago)     6m13s   10.244.0.248   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   1/1     Running             2 (15s ago)     6m14s   10.244.0.248   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   1/1     Terminating         2 (3m5s ago)    7m40s   10.244.0.247   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   1/1     Terminating         2 (101s ago)    7m40s   10.244.0.248   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   0/1     Terminating         2               7m49s   10.244.0.247   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   0/1     Terminating         2               7m49s   10.244.0.247   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-svhb2   0/1     Terminating         2               7m49s   10.244.0.247   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   0/1     Terminating         2               7m49s   10.244.0.248   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   0/1     Terminating         2               7m49s   10.244.0.248   kind-control-plane   <none>           <none>
+myapp-7b7fcff77d-mtxkj   0/1     Terminating         2               7m49s   10.244.0.248   kind-control-plane   <none>           <none>
+myapp-6f76df8fc4-mk9r6   0/1     Pending             0               0s      <none>         <none>               <none>           <none>
+myapp-6f76df8fc4-mk9r6   0/1     Pending             0               0s      <none>         kind-control-plane   <none>           <none>
+myapp-6f76df8fc4-27tk9   0/1     Pending             0               0s      <none>         <none>               <none>           <none>
+myapp-6f76df8fc4-27tk9   0/1     Pending             0               1s      <none>         kind-control-plane   <none>           <none>
+myapp-6f76df8fc4-mk9r6   0/1     ContainerCreating   0               1s      <none>         kind-control-plane   <none>           <none>
+myapp-6f76df8fc4-27tk9   0/1     ContainerCreating   0               1s      <none>         kind-control-plane   <none>           <none>
+myapp-6f76df8fc4-mk9r6   1/1     Running             0               4s      10.244.0.249   kind-control-plane   <none>           <none>
+myapp-6f76df8fc4-27tk9   1/1     Running             0               4s      10.244.0.250   kind-control-plane   <none>           <none>
+myapp-6f76df8fc4-27tk9   0/1     Completed           0               86s     10.244.0.250   kind-control-plane   <none>           <none>
+myapp-6f76df8fc4-27tk9   1/1     Running             1 (1s ago)      87s     10.244.0.250   kind-control-plane   <none>           <none>
+myapp-6f76df8fc4-mk9r6   0/1     Completed           0               3m58s   10.244.0.249   kind-control-plane   <none>           <none>
+myapp-6f76df8fc4-mk9r6   1/1     Running             1 (1s ago)      3m59s   10.244.0.249   kind-control-plane   <none>           <none>
