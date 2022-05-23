@@ -42,9 +42,12 @@ defmodule Mndb do
   A test function for rpc execution on another node via `GenServer.call`. Instead of `:rpc.call(<node>, Module, :function, [args])`, you do `GenSever.call({Module, <node>},{:function})`.
 
   ```elixir
+  :rpc.cal():"b@127.0.0.1", Mndb, :data, [])
+  <=>
   GenServer.call({Mndb, :"b@127.0.0.1"}, {:data})
   for node <- Node.list(), do: {node, GenServer.call({Mndb, node}, {:data}) }
     ```
+
   """
   def data(), do: GenServer.call(__MODULE__, {:data})
 
@@ -52,13 +55,11 @@ defmodule Mndb do
 
   ################ Server callbacks
   @doc """
-  Flag to trap exit, Erlang monitor ndoes, Mnesia init (schema, start, subscribe). A flag is added to trigger the GenServer that runs the `terminate` callback when going down.
+  Flag to trap exit, enable Erlang monitor nodes, init Mnesia (schema, start, subscribe). A flag is added to trigger the GenServer that runs the `terminate` callback when going down.
   """
   @impl true
   def init(opts) do
-    # %{store: store, mn_table: mn_table} =
     state = Enum.into(opts, %{})
-
     Process.flag(:trap_exit, true)
 
     with :ok <- :net_kernel.monitor_nodes(true),
@@ -73,32 +74,37 @@ defmodule Mndb do
   def ensure_start() do
     :stopped = Mnesia.stop()
 
-    if Node.list() == [] do
-      Mnesia.create_schema([node()])
-      Logger.debug("Schema created at Node #{inspect(node())}")
-    end
+    if(Node.list() == [], do: Mnesia.create_schema([node()]))
 
-    with :ok <- Mnesia.start(),
-         {:ok, _node} <- Mnesia.subscribe(:system) do
+    with {:start, :ok} <- {:start, Mnesia.start()},
+         {:subscribe, {:ok, _node}} <- {:subscribe, Mnesia.subscribe(:system)} do
       :ok
+    else
+      {_, reason} ->
+        send(__MODULE__, {:stop, reason})
     end
   end
 
   @doc """
-  - Erlang EPMD send a `:nodeup` event. We update Mnesia knowledge and instanciate the table.
-  - We use the Mnesia UP event to update the Mnesia cluster. Then if we want disc copies, we have to "create" the disc in the node by copying the schema onto the node's disc. Then we can disc-copy the table. If no disc-copy of the schema, only a RAM copy will exist.
-  - We capture all Mnesia system events. In case of a network failure, we have an inconsistant database and shut down Mnesia until a new connection appears with EPMD.
-
+  The first node sets the schema.
+  Wnen Erlang EPMD sends a `:nodeup` event, we create a table and update Mnesia cluster.
+  When Mnesia sends an UP event, we firstly update the cluster, then copy the schema on disc to allow tables to be created at the node, whether in RAM or on disc.
   """
   @impl true
   def handle_info({:nodeup, node}, state) do
     Logger.debug("Node #{inspect(node)} is UP")
 
-    with :ok <- Mndb.create_table(state.mn_table, state.disc_copy),
-         :ok <- Mndb.update() do
+    with {:create, {:ok, _node}} <- {:create, Mndb.create_table(state.mn_table, state.disc_copy)},
+         {:update, {:ok, _node}} <- {:update, Mndb.update()} do
       {:noreply, state}
     else
-      {:error, reason} ->
+      {:create, reason} ->
+        send(__MODULE__, {:stop, {:create, reason}})
+
+      {:udpate, reason} ->
+        send(__MODULE__, {:stop, {:udpate, reason}})
+
+      {_, reason} ->
         send(__MODULE__, {:stop, reason})
         {:noreply, state}
     end
@@ -106,23 +112,33 @@ defmodule Mndb do
     {:noreply, state}
   end
 
-  @impl true
-  def handle_info({:nodedown, _node}, state) do
-    # Mndb.update()
-    {:noreply, state}
-  end
+  # @impl true
+  # def handle_info({:nodedown, _node}, state) do
+  #   {:noreply, state}
+  # end
 
   @impl true
   def handle_info(
         {:mnesia_system_event, {:mnesia_up, node}},
         state
       ) do
-    with :ok <- Mndb.update(),
-         :ok <- Mndb.copy_schema(),
-         :ok <- Mndb.remote_to_node(state.mn_table, state.disc_copy) do
-      Logger.debug("handle-up-then-after update: #{inspect(Mndb.info())}")
-      Process.sleep(500)
+    Logger.notice("Mnesia is UP at #{inspect(node)}")
+
+    with {:update, {:ok, _node}} <- {:update, Mndb.update()},
+         {:copy_sch, {:ok, _node}} <- {:copy_sch, Mndb.copy_schema()},
+         {:remote, {:ok, _node}} <-
+           {:remote, Mndb.remote_to_node(state.mn_table, state.disc_copy)} do
+      Logger.warn("Mnesia-up: #{inspect(Mndb.info())}")
     else
+      {:update, {:error, reason}} ->
+        send(__MODULE__, {:stop, {:update, reason}})
+
+      {:copy_sch, {:error, reason}} ->
+        send(__MODULE__, {:stop, {:copy_sch, reason}})
+
+      {:remote, {:error, reason}} ->
+        send(__MODULE__, {:stop, {:remote, reason}})
+
       {:error, reason} ->
         send(__MODULE__, {:stop, reason})
     end
@@ -130,14 +146,13 @@ defmodule Mndb do
     {:noreply, state}
   end
 
-  @impl true
-  def handle_info(
-        {:mnesia_system_event, {:mnesia_down, _node}},
-        state
-      ) do
-    # Mndb.update()
-    {:noreply, state}
-  end
+  # @impl true
+  # def handle_info(
+  #       {:mnesia_system_event, {:mnesia_down, _node}},
+  #       state
+  #     ) do
+  #   {:noreply, state}
+  # end
 
   @impl true
   def handle_info({:mnesia_system_event, message}, state) do
@@ -164,19 +179,14 @@ defmodule Mndb do
   We declare fresh new nodes to Mnesia. The doc says: "this function must only be used to connect to newly started RAM nodes with an empty schema. If, for example, this function is used after the network has been partitioned, it can lead to inconsistent tables".
   """
   def update() do
-    Logger.debug("Update inspect init: #{inspect(node())}, #{inspect(Node.list())}")
+    # Logger.debug("Update inspect init: #{inspect(node())}, #{inspect(Node.list())}")
 
     case Mnesia.change_config(:extra_db_nodes, Node.list()) do
-      # {:ok, [t | h]} ->
-      # Logger.debug("Update #{inspect(node())}- chg conf: #{inspect(t)}, #{inspect(h)}")
-      # :ok
-
       {:ok, _} ->
-        # Logger.debug("Update #{inspect(node())} - cong config: []")
-        :ok
+        {:ok, node()}
 
       {:error, reason} ->
-        Logger.debug("U@N: #{inspect(node())} - #{inspect(reason)}")
+        Logger.debug("No node: #{inspect(node())} - #{inspect(reason)}")
         {:error, reason}
     end
   end
@@ -193,13 +203,15 @@ defmodule Mndb do
     case Mnesia.change_table_copy_type(:schema, node(), :disc_copies) do
       #
       {:atomic, :ok} ->
-        Logger.debug("Schema of disc copy type #{inspect(node())}")
-        :ok
+        # node = node()
+        # Logger.debug("Schema of disc copy type #{inspect(node())}")
+        {:ok, node()}
 
       #
       {:aborted, {:already_exists, :schema, _, _}} ->
-        Logger.debug("Schema already of disc copy type #{inspect(node())}")
-        :ok
+        # node = node()
+        # Logger.debug("Schema already of disc copy type #{inspect(node())}")
+        {:ok, node()}
 
       #
       {:aborted, reason} ->
@@ -231,15 +243,15 @@ defmodule Mndb do
 
     case table do
       {:atomic, :ok} ->
-        Logger.debug("#{inspect(name)} created #{inspect(node())}")
-        :ok
+        # Logger.debug("#{inspect(name)} created #{inspect(node())}")
+        {:ok, node()}
 
       {:aborted, {:already_exists, _name}} ->
-        Logger.debug("#{inspect(name)} already exists #{inspect(node())}")
-        :ok
+        # Logger.debug("#{inspect(name)} already exists #{inspect(node())}")
+        {:ok, node()}
 
       {:aborted, reason} ->
-        Logger.debug("Ensure Table: #{inspect(reason)}, #{inspect(node())}")
+        # Logger.debug("Ensure Table: #{inspect(reason)}, #{inspect(node())}")
         {:error, reason}
     end
   end
@@ -249,36 +261,35 @@ defmodule Mndb do
   """
   def remote_to_node(name, disc_copy) do
     type = unless disc_copy, do: :ram_copies, else: :disc_copies
-    Logger.debug("#{inspect(node())}: in remote: #{inspect(type)}")
+    # Logger.debug("#{inspect(node())}: in remote: #{inspect(type)}")
 
     with :ok <- Mnesia.wait_for_tables([name], 3_000) do
       case Mnesia.add_table_copy(name, node(), type) do
         {:atomic, :ok} ->
-          Logger.debug("Table copied #{inspect(node())}")
-          Process.sleep(500)
-          :ok
+          # Logger.debug("Table copied #{inspect(node())}")
+          # Process.sleep(500)
+          # node = node()
+          {:ok, node()}
 
         {:aborted, {:already_exists, _name, node}} ->
-          Logger.debug("Table already copied, from Aborted, #{inspect(node)}")
+          # Logger.debug("Table already copied, from Aborted, #{inspect(node)}")
           # Logger.debug("Remote: #{inspect(node())},  #{inspect(Mndb.info())}}")
-          Process.sleep(500)
-          :ok
+          # Process.sleep(500)
+          {:ok, node}
 
-        {:error, {:already_exists, table, node, _}} ->
-          Logger.debug("Table #{table} already copied, from Error, #{inspect(node)}")
+        {:error, {:already_exists, _table, node, _}} ->
+          # Logger.debug("Table #{table} already copied, from Error, #{inspect(node)}")
           # Logger.debug("Remote: #{inspect(node())},  #{inspect(Mndb.info())}}")
-          Process.sleep(500)
-          :ok
+          # Process.sleep(500)
+          {:ok, node}
 
         {:aborted, reason} ->
-          Logger.debug("set type at node: #{inspect(reason)}, #{inspect(node)}")
+          Logger.debug("Can't set type at node: #{inspect(reason)}, #{inspect(node())}")
           {:error, reason}
       end
     else
       {:error, reason} -> {:error, reason}
     end
-
-    :ok
   end
 
   @impl true

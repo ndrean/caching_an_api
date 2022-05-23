@@ -1,4 +1,7 @@
-import Config
+# import Config
+
+# config :mnesia,
+#   dir: 'mndb_#{System.fetch_env!("POD_IP")}'
 
 # config :caching_an_api,
 #   # :gossip_cluster or :k8_cluster

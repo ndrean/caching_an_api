@@ -1,7 +1,7 @@
 import Config
 
 config :mnesia,
-  dir: 'mndb_#{Node.self()}'
+  dir: 'mndb_#{node()}'
 
 config :logger, :console, format: "[$date $time] $message\n", colors: [enabled: true]
 

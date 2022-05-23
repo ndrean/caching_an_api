@@ -36,7 +36,7 @@ USER app
 WORKDIR /opt/app
 
 ENV RELEASE_DISTRIBUTION=name
-ENV NODE_IP=127.0.0.1 
+ENV POD_IP=127.0.0.1 
 # <- will be overridden 
 ENV RELEASE_NODE=${BUILD_NAME}@${POD_IP}
 
