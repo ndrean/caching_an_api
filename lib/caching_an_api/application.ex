@@ -95,5 +95,5 @@ defmodule CachingAnApi.Application do
   #   |> Atom.to_string()
   # end
 
-  # defp check_ip, do: System.cmd("hostname", ["-s"]) |> elem(0) |> String.trim()
+  defp get_ip, do: System.cmd("hostname", ["-s"]) |> elem(0) |> String.trim()
 end

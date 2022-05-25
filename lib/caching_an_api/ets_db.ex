@@ -8,7 +8,7 @@ defmodule EtsDb do
         [:ordered_set, :public, :named_table, read_concurrency: true]
       )
 
-    Logger.info("Ets cache up: #{name}", ansi_color: :cyan)
+    Logger.info("Ets cache up: #{name} at #{node()}", ansi_color: :cyan)
     :ok
   end
 

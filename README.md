@@ -237,10 +237,11 @@ The [Mnesia](http://erlang.org/documentation/doc-5.2/pdf/mnesia-4.1.pdf) documen
 
 Usefull libraries:
 
+- [library mmnesiam](https://github.com/mustafaturan/mnesiam/blob/39b4645a6ccc3e5cea85e735fe5627b1f8d8034e/lib/mnesiam.ex)
 - [library Mnesiac](https://github.com/beardedeagle/mnesiac/blob/master/lib/mnesiac/store_manager.ex)
 - [Library Amensia](https://github.com/meh/amnesia)
 
-Other [nice source](https://mbuffa.github.io/tips/20201111-elixir-troubleshooting-mnesia/) or [here](https://www.welcometothejungle.com/fr/articles/redis-mnesia-distributed-database) and a bit about [amensia](https://code.tutsplus.com/articles/store-everything-with-elixir-and-mnesia--cms-29821).
+Other [nice source](https://stackoverflow.com/questions/13398632/creating-mnesia-disk-copies-of-existing-ram-table) or [here](https://mbuffa.github.io/tips/20201111-elixir-troubleshooting-mnesia/) or [here](https://www.welcometothejungle.com/fr/articles/redis-mnesia-distributed-database) and a bit about [amensia](https://code.tutsplus.com/articles/store-everything-with-elixir-and-mnesia--cms-29821).
 
 ### Configuration
 

@@ -1,6 +1,6 @@
 defmodule Mndb.Supervisor do
   use Supervisor
-  require Logger
+
   # https://github.com/beardedeagle/mnesiac/blob/master/lib/mnesiac/supervisor.ex
 
   def start_link(init_args) do
